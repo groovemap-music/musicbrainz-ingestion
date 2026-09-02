@@ -25,7 +25,7 @@ RUN mkdir src && \
 COPY src ./src
 
 # Build the application
-RUN touch src/main.rs && \
+RUN touch src/main.rs src/lib.rs && \
     cargo build --release --locked
 
 # Runtime stage
