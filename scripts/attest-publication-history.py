@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPOSITORY = "groovemap-music/catalog-ingestion"
+REPOSITORY = "groovemap-music/musicbrainz-ingestion"
 ARCHIVE_COMMIT = "daf82a149aaa382b3cebbd4b43d3c82e53d4128e"
 PRIVATE_PLANNING_ROOTS = (".planning", "docs/superpowers", "docs/specs")
 PRESERVED_PUBLIC_PATH = "docs/extraction.md"

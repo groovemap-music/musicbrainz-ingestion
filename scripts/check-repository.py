@@ -64,7 +64,6 @@ def check_conceptual_diagrams() -> None:
         ROOT / "docs" / "state-marker-system.md",
         ROOT / "docs" / "state-marker-periodic-updates.md",
         ROOT / "docs" / "decisions" / "0001-producer-normalization-boundary.md",
-        ROOT / "docs" / "decisions" / "0002-discogs-first-musicbrainz-coordination.md",
     )
     non_mermaid_diagram_fences = {"blockdiag", "d2", "dot", "graphviz", "nomnoml", "plantuml", "puml", "seqdiag"}
 
@@ -80,7 +79,7 @@ def check_conceptual_diagrams() -> None:
 
 cargo = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))["package"]
 require(cargo["license"] == "MIT", "Cargo package must use the approved MIT license")
-require(cargo["repository"] == "https://github.com/groovemap-music/catalog-ingestion", "stale repository URL")
+require(cargo["repository"] == "https://github.com/groovemap-music/musicbrainz-ingestion", "stale repository URL")
 require(cargo["publish"] is False, "crate publication must remain disabled")
 
 dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
@@ -90,15 +89,15 @@ require(re.search(r"^ARG UID=1000$", dockerfile, re.MULTILINE) is not None, "Doc
 require(re.search(r"^ARG GID=1000$", dockerfile, re.MULTILINE) is not None, "Dockerfile must pin the default GID")
 require("useradd -r -l -u ${UID}" in dockerfile, "runtime user must use the configured UID")
 require(re.search(r"^USER \$\{UID\}:\$\{GID\}$", dockerfile, re.MULTILINE) is not None, "runtime USER must match the owned directories")
-require('org.opencontainers.image.title="catalog-ingestion"' in dockerfile, "container image title must match the repository")
+require('org.opencontainers.image.title="musicbrainz-ingestion"' in dockerfile, "container image title must match the repository")
 require("RUST_EXTRACTOR_CONFIG" not in dockerfile, "unused legacy extractor configuration variable must stay removed")
 
 release_workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-require("repository-name: catalog-ingestion" in release_workflow, "release workflow must use the repository identity")
+require("repository-name: musicbrainz-ingestion" in release_workflow, "release workflow must use the repository identity")
 require("publish-image: true" in release_workflow, "release workflow must publish the repository-named image")
 
 polite_http = (ROOT / "src" / "polite_http.rs").read_text(encoding="utf-8")
-require("groovemap-catalog-ingestion/" in polite_http, "default User-Agent must identify GrooveMap catalog ingestion")
+require("groovemap-musicbrainz-ingestion/" in polite_http, "default User-Agent must identify GrooveMap catalog ingestion")
 
 for runtime_identity_source in (ROOT / "src" / "main.rs", ROOT / "src" / "health.rs"):
     text = runtime_identity_source.read_text(encoding="utf-8").lower()
