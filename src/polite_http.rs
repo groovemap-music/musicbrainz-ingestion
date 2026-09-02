@@ -196,7 +196,7 @@ mod tests {
     fn default_user_agent_uses_public_repository_identity() {
         assert_eq!(
             DEFAULT_USER_AGENT,
-            concat!("groovemap-catalog-ingestion/", env!("CARGO_PKG_VERSION"), " (+https://github.com/groovemap-music/catalog-ingestion)")
+            concat!("groovemap-musicbrainz-ingestion/", env!("CARGO_PKG_VERSION"), " (+https://github.com/groovemap-music/musicbrainz-ingestion)")
         );
     }
 

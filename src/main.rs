@@ -1,28 +1,11 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use clap::Parser;
+use extractor::{config::ExtractorConfig, health::HealthServer, musicbrainz, runtime};
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tracing::{error, info};
-
-mod config;
-#[allow(dead_code)]
-mod generated {
-    pub mod catalog_contract;
-}
-mod health;
-mod message_queue;
-mod musicbrainz;
-mod polite_http;
-mod runtime;
-mod state_marker;
-mod types;
-
-use config::ExtractorConfig;
-use health::HealthServer;
 
 /// GrooveMap catalog ingestion for MusicBrainz.
 #[derive(Parser, Debug)]

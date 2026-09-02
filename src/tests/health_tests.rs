@@ -45,7 +45,7 @@ async fn test_health_handler_default_state() {
 
     let value = json.0;
     assert_eq!(value["status"], "healthy");
-    assert_eq!(value["service"], "catalog-ingestion");
+    assert_eq!(value["service"], "musicbrainz-ingestion");
     assert_eq!(value["extraction_progress"]["total"], 0);
     // With no extraction activity, last_extraction_time values should be null
     assert!(value["last_extraction_time"]["artists"].is_null());
@@ -189,7 +189,7 @@ async fn test_health_server_run_and_endpoints() {
     let text = resp.text().await.unwrap();
     let body: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(body["status"], "healthy");
-    assert_eq!(body["service"], "catalog-ingestion");
+    assert_eq!(body["service"], "musicbrainz-ingestion");
     assert_eq!(body["extraction_status"], "idle");
 
     // Test /metrics endpoint

@@ -10,10 +10,10 @@ fn test_exchange_names_default_prefix() {
         max_retries: 1,
         exchange_prefix: DEFAULT_EXCHANGE_PREFIX.to_string(),
     };
-    assert_eq!(mq.exchange_name(DataType::Artists), "groovemap-discogs-artists");
-    assert_eq!(mq.exchange_name(DataType::Labels), "groovemap-discogs-labels");
-    assert_eq!(mq.exchange_name(DataType::Masters), "groovemap-discogs-masters");
-    assert_eq!(mq.exchange_name(DataType::Releases), "groovemap-discogs-releases");
+    assert_eq!(mq.exchange_name(DataType::Artists), "groovemap-musicbrainz-artists");
+    assert_eq!(mq.exchange_name(DataType::Labels), "groovemap-musicbrainz-labels");
+    assert_eq!(mq.exchange_name(DataType::ReleaseGroups), "groovemap-musicbrainz-release-groups");
+    assert_eq!(mq.exchange_name(DataType::Releases), "groovemap-musicbrainz-releases");
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn test_message_serialization_file_complete() {
 
 #[test]
 fn test_constants() {
-    assert_eq!(DEFAULT_EXCHANGE_PREFIX, "groovemap-discogs");
+    assert_eq!(DEFAULT_EXCHANGE_PREFIX, "groovemap-musicbrainz");
     assert_eq!(AMQP_EXCHANGE_TYPE, ExchangeKind::Fanout);
 }
 

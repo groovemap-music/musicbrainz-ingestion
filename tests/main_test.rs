@@ -48,7 +48,7 @@ fn test_lapin_level_selection() {
 #[tokio::test]
 async fn test_ascii_art_generation() {
     let main_source = include_str!("../src/main.rs");
-    assert!(main_source.contains("catalog-ingestion"));
+    assert!(main_source.contains("musicbrainz-ingestion"));
     assert!(main_source.contains("print_ascii_art"));
 }
 
