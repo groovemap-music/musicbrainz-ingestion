@@ -77,8 +77,7 @@ impl ExtractorConfig {
 
         let musicbrainz_root = PathBuf::from(std::env::var("MUSICBRAINZ_ROOT").unwrap_or_else(|_| "/musicbrainz-data".to_string()));
 
-        let musicbrainz_exchange_prefix =
-            std::env::var("MUSICBRAINZ_EXCHANGE_PREFIX").unwrap_or_else(|_| DEFAULT_EXCHANGE_PREFIX.to_string());
+        let musicbrainz_exchange_prefix = std::env::var("MUSICBRAINZ_EXCHANGE_PREFIX").unwrap_or_else(|_| DEFAULT_EXCHANGE_PREFIX.to_string());
 
         let musicbrainz_dump_url =
             std::env::var("MUSICBRAINZ_DUMP_URL").unwrap_or_else(|_| "https://data.metabrainz.org/pub/musicbrainz/data/json-dumps/".to_string());
