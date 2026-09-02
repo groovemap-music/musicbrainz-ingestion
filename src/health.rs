@@ -63,7 +63,7 @@ async fn health_handler(State((state, _)): State<AppState>) -> (StatusCode, Json
 
     let health = json!({
         "status": "healthy",
-        "service": "catalog-ingestion",
+        "service": "musicbrainz-ingestion",
         "extraction_status": state.extraction_status.as_str(),
         "extraction_progress": {
             "artists": state.extraction_progress.artists,

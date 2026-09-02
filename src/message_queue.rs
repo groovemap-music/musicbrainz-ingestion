@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use crate::types::{DataMessage, DataType, ExtractionCompleteMessage, FileCompleteMessage, Message};
 
 #[cfg(test)]
-const DEFAULT_EXCHANGE_PREFIX: &str = crate::generated::catalog_contract::DEFAULT_DISCOGS_EXCHANGE_PREFIX;
+const DEFAULT_EXCHANGE_PREFIX: &str = crate::generated::catalog_contract::DEFAULT_EXCHANGE_PREFIX;
 const AMQP_EXCHANGE_TYPE: ExchangeKind = ExchangeKind::Fanout;
 
 /// Deadline for a publisher-confirm to come back from the broker.

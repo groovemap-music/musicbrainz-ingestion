@@ -12,7 +12,7 @@ fn test_default_config() {
     assert_eq!(config.state_save_interval, 5000);
     assert_eq!(config.health_port, 8000);
     assert_eq!(config.amqp_connection, "amqp://groovemap:groovemap@localhost:5672/%2F");
-    assert_eq!(config.discogs_root, PathBuf::from("/discogs-data"));
+    assert_eq!(config.musicbrainz_root, PathBuf::from("/musicbrainz-data"));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn test_from_env_with_all_settings() {
         env::set_var("RABBITMQ_PASSWORD", "testpass");
         env::remove_var("RABBITMQ_HOST");
         env::remove_var("RABBITMQ_PORT");
-        env::remove_var("DISCOGS_ROOT");
+        env::remove_var("MUSICBRAINZ_ROOT");
         env::remove_var("PERIODIC_CHECK_DAYS");
         env::remove_var("BATCH_SIZE");
         env::remove_var("MAX_WORKERS");
@@ -77,14 +77,14 @@ fn test_from_env_with_all_settings() {
     assert_eq!(config.amqp_connection, "amqp://testuser:testpass@rabbitmq:5672/%2F");
 
     unsafe {
-        env::set_var("DISCOGS_ROOT", "/custom/path");
+        env::set_var("MUSICBRAINZ_ROOT", "/custom/path");
         env::set_var("PERIODIC_CHECK_DAYS", "30");
         env::set_var("BATCH_SIZE", "200");
         env::set_var("MAX_WORKERS", "8");
     }
 
     let config2 = ExtractorConfig::from_env().unwrap();
-    assert_eq!(config2.discogs_root, PathBuf::from("/custom/path"));
+    assert_eq!(config2.musicbrainz_root, PathBuf::from("/custom/path"));
     assert_eq!(config2.periodic_check_days, 30);
     assert_eq!(config2.batch_size, 200);
     assert_eq!(config2.max_workers, 8);
@@ -92,7 +92,7 @@ fn test_from_env_with_all_settings() {
     unsafe {
         env::remove_var("RABBITMQ_USERNAME");
         env::remove_var("RABBITMQ_PASSWORD");
-        env::remove_var("DISCOGS_ROOT");
+        env::remove_var("MUSICBRAINZ_ROOT");
         env::remove_var("PERIODIC_CHECK_DAYS");
         env::remove_var("BATCH_SIZE");
         env::remove_var("MAX_WORKERS");
@@ -101,13 +101,13 @@ fn test_from_env_with_all_settings() {
 
 #[test]
 #[serial]
-fn test_from_env_default_discogs_root() {
+fn test_from_env_default_musicbrainz_root() {
     unsafe {
-        env::remove_var("DISCOGS_ROOT");
+        env::remove_var("MUSICBRAINZ_ROOT");
     }
 
     let config = ExtractorConfig::from_env().unwrap();
-    assert_eq!(config.discogs_root, PathBuf::from("/discogs-data"));
+    assert_eq!(config.musicbrainz_root, PathBuf::from("/musicbrainz-data"));
 }
 
 #[test]
@@ -215,25 +215,6 @@ fn test_musicbrainz_dump_url_from_env() {
     assert_eq!(config.musicbrainz_dump_url, "http://localhost:9999/dumps/");
     unsafe {
         std::env::remove_var("MUSICBRAINZ_DUMP_URL");
-    }
-}
-
-#[test]
-fn test_discogs_health_url_default() {
-    let config = ExtractorConfig::default();
-    assert_eq!(config.discogs_health_url, "http://extractor-discogs:8000/health");
-}
-
-#[test]
-#[serial]
-fn test_discogs_health_url_from_env() {
-    unsafe {
-        std::env::set_var("DISCOGS_HEALTH_URL", "http://custom-host:9000/health");
-    }
-    let config = ExtractorConfig::from_env().unwrap();
-    assert_eq!(config.discogs_health_url, "http://custom-host:9000/health");
-    unsafe {
-        std::env::remove_var("DISCOGS_HEALTH_URL");
     }
 }
 

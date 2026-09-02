@@ -14,12 +14,12 @@ jobs:
   release:
     uses: groovemap-music/automation/.github/workflows/reusable-release.yml@2f34a4da5c552bc23c75edd3d8d81be0a4b3271c
     with:
-      repository-name: catalog-ingestion
+      repository-name: musicbrainz-ingestion
       setup-command: just setup
       check-command: just check
       release-command: just release-dry-run
-      artifact-path: dist/catalog-ingestion.tar.gz
+      artifact-path: dist/musicbrainz-ingestion.tar.gz
       checksums-path: dist/SHA256SUMS
       notices-path: dist/THIRD_PARTY_NOTICES.json
-      sbom-path: dist/catalog-ingestion.cdx.json
+      sbom-path: dist/musicbrainz-ingestion.cdx.json
       publish-image: true

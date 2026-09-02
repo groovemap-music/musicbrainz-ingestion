@@ -30,13 +30,6 @@ test:
     cargo test --all-features --locked
 
 source-characterization:
-    cargo test --all-features --locked --test provider_split_baseline_test
-    cargo test --all-features --locked --test provider_module_boundary_test
-    cargo test --all-features --locked --test extractor_di_test discogs
-    cargo test --all-features --locked --test extractor_di_test musicbrainz
-    cargo test --all-features --locked discogs::parser::tests::
-    cargo test --all-features --locked discogs::normalize::tests::
-    cargo test --all-features --locked discogs::rules::tests::
     cargo test --all-features --locked musicbrainz::jsonl_parser::tests::
 
 coverage: bootstrap
@@ -51,7 +44,6 @@ contract-check:
 
 repository-check:
     mise exec -- python scripts/check-repository.py
-    mise exec -- python scripts/check-provider-split-cutover.py
 
 publication-history-test:
     PYTHONDONTWRITEBYTECODE=1 mise exec -- python -m unittest discover -s tests -p 'test_publication_history.py'
@@ -66,8 +58,8 @@ build:
     cargo build --release --locked
 
 install-check:
-    test -x target/release/extractor
-    install_root="$(mktemp -d)"; trap 'rm -rf "${install_root}"' EXIT; install -m 0755 target/release/extractor "${install_root}/catalog-ingestion"; "${install_root}/catalog-ingestion" --help >/dev/null
+    test -x target/release/musicbrainz-ingestion
+    install_root="$(mktemp -d)"; trap 'rm -rf "${install_root}"' EXIT; install -m 0755 target/release/musicbrainz-ingestion "${install_root}/musicbrainz-ingestion"; "${install_root}/musicbrainz-ingestion" --help >/dev/null
 
 build-check:
     cargo check --all-targets --all-features --locked
@@ -86,7 +78,7 @@ cyclonedx: bootstrap
     mise exec {{cargo_cyclonedx_tool}} -- cargo cyclonedx --format json
 
 image:
-    docker build --pull --tag catalog-ingestion:local .
+    docker build --pull --tag musicbrainz-ingestion:local .
 
 bump-preview:
     mise exec -- python scripts/check_bump_preview.py

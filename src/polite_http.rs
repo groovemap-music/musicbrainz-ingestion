@@ -27,7 +27,7 @@ use tracing::{info, warn};
 
 /// Default User-Agent advertised to upstream servers.
 pub const DEFAULT_USER_AGENT: &str =
-    concat!("groovemap-catalog-ingestion/", env!("CARGO_PKG_VERSION"), " (+https://github.com/groovemap-music/catalog-ingestion)");
+    concat!("groovemap-musicbrainz-ingestion/", env!("CARGO_PKG_VERSION"), " (+https://github.com/groovemap-music/musicbrainz-ingestion)");
 
 #[derive(Debug, Clone)]
 pub struct PoliteConfig {

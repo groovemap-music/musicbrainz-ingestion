@@ -1,6 +1,6 @@
 {
   "data_type": "artists",
-  "file": "contract-artists.xml.gz",
+  "file": "artist.jsonl.xz",
   "timestamp": "2000-01-01T00:00:00Z",
   "total_processed": 1,
   "type": "file_complete"

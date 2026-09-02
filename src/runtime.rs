@@ -192,6 +192,7 @@ pub async fn message_publisher(
 }
 
 /// Progress reporter task
+#[allow(dead_code)] // retained for runtime diagnostics tests; MusicBrainz reports per-file progress
 pub(crate) async fn progress_reporter(state: Arc<RwLock<ExtractorState>>, shutdown: Arc<tokio::sync::Notify>) {
     let mut report_count = 0;
 

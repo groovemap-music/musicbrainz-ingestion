@@ -1,10 +1,8 @@
 //! MusicBrainz-owned acquisition, JSONL enrichment, and orchestration.
 //!
-//! The provider capability depends on the shared runtime mechanics. Its current
-//! Discogs-health coordination is isolated in `combined_runtime_compat` so the
-//! future provider-owned container can remove it and ingest concurrently.
+//! The provider capability depends only on shared runtime mechanics within this
+//! repository. It has no cross-container ordering, health polling, or lock.
 
-pub mod combined_runtime_compat;
 pub mod downloader;
 pub mod jsonl_parser;
 
@@ -25,8 +23,6 @@ use crate::runtime::{
 use crate::state_marker::{PhaseStatus, ProcessingDecision, StateMarker};
 use crate::types::{DataMessage, DataType, ExtractionProgress};
 
-use self::combined_runtime_compat::{WaitOutcome, wait_for_discogs_idle};
-
 pub async fn run_musicbrainz_loop(
     config: Arc<ExtractorConfig>,
     state: Arc<RwLock<ExtractorState>>,
@@ -41,14 +37,6 @@ pub async fn run_musicbrainz_loop(
     let shutdown_flag = spawn_shutdown_flag_monitor(shutdown.clone());
 
     info!("🎵 Starting MusicBrainz extraction...");
-
-    // Preserve the combined-runtime compatibility wait before MusicBrainz starts. This call
-    // intentionally lives on the MusicBrainz side; provider-owned containers remove this
-    // compatibility seam and run independently. A shutdown during the current wait must exit.
-    if wait_for_discogs_idle(&config.discogs_health_url, &shutdown_flag).await? == WaitOutcome::Shutdown {
-        info!("🛑 Shutdown requested while waiting for Discogs, skipping MusicBrainz extraction");
-        return Ok(());
-    }
 
     let success = process_musicbrainz_data(config.clone(), state.clone(), shutdown_flag.clone(), force_reprocess, mq_factory.clone()).await?;
 
@@ -82,15 +70,6 @@ pub async fn run_musicbrainz_loop(
         tokio::select! {
             _ = sleep(check_interval) => {
                 info!("🔄 Starting periodic check for new MusicBrainz dumps...");
-                // Wait for Discogs extractor to finish before starting MusicBrainz
-                match wait_for_discogs_idle(&config.discogs_health_url, &shutdown_flag).await {
-                    Ok(WaitOutcome::Shutdown) => {
-                        info!("🛑 Shutdown requested while waiting for Discogs, skipping periodic MusicBrainz check");
-                        break;
-                    }
-                    Ok(WaitOutcome::Proceed) => {}
-                    Err(e) => error!("❌ Failed to check Discogs health: {}", e),
-                }
                 let start = Instant::now();
                 match process_musicbrainz_data(config.clone(), state.clone(), shutdown_flag.clone(), false, mq_factory.clone()).await {
                     Ok(true) => {
@@ -107,15 +86,6 @@ pub async fn run_musicbrainz_loop(
             }
             trigger_force_reprocess = wait_for_trigger(&trigger) => {
                 info!("🔄 MusicBrainz extraction triggered via API (force_reprocess={})...", trigger_force_reprocess);
-                // Wait for Discogs extractor to finish before starting MusicBrainz
-                match wait_for_discogs_idle(&config.discogs_health_url, &shutdown_flag).await {
-                    Ok(WaitOutcome::Shutdown) => {
-                        info!("🛑 Shutdown requested while waiting for Discogs, skipping triggered MusicBrainz extraction");
-                        break;
-                    }
-                    Ok(WaitOutcome::Proceed) => {}
-                    Err(e) => error!("❌ Failed to check Discogs health: {}", e),
-                }
                 let start = Instant::now();
                 match process_musicbrainz_data(config.clone(), state.clone(), shutdown_flag.clone(), trigger_force_reprocess, mq_factory.clone()).await {
                     Ok(true) => info!("✅ Triggered MusicBrainz extraction completed in {:?}", start.elapsed()),

@@ -2,13 +2,11 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::generated::catalog_contract::{DEFAULT_DISCOGS_EXCHANGE_PREFIX, DEFAULT_MUSICBRAINZ_EXCHANGE_PREFIX};
-use crate::types::Source;
+use crate::generated::catalog_contract::DEFAULT_EXCHANGE_PREFIX;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractorConfig {
     pub amqp_connection: String,
-    pub discogs_root: PathBuf,
     pub periodic_check_days: u64,
     pub health_port: u16,
     pub max_workers: usize,
@@ -16,20 +14,15 @@ pub struct ExtractorConfig {
     pub queue_size: usize,
     pub progress_log_interval: usize,
     pub state_save_interval: usize,
-    pub data_quality_rules: Option<PathBuf>,
-    pub source: Source,
     pub musicbrainz_root: PathBuf,
-    pub discogs_exchange_prefix: String,
     pub musicbrainz_exchange_prefix: String,
     pub musicbrainz_dump_url: String,
-    pub discogs_health_url: String,
 }
 
 impl Default for ExtractorConfig {
     fn default() -> Self {
         Self {
             amqp_connection: build_amqp_url("groovemap", "groovemap", "localhost", "5672"),
-            discogs_root: PathBuf::from("/discogs-data"),
             periodic_check_days: 15,
             health_port: 8000,
             max_workers: num_cpus::get(),
@@ -37,13 +30,9 @@ impl Default for ExtractorConfig {
             queue_size: 5000,
             progress_log_interval: 1000,
             state_save_interval: 5000,
-            data_quality_rules: None,
-            source: Source::Discogs,
             musicbrainz_root: PathBuf::from("/musicbrainz-data"),
-            discogs_exchange_prefix: DEFAULT_DISCOGS_EXCHANGE_PREFIX.to_string(),
-            musicbrainz_exchange_prefix: DEFAULT_MUSICBRAINZ_EXCHANGE_PREFIX.to_string(),
+            musicbrainz_exchange_prefix: DEFAULT_EXCHANGE_PREFIX.to_string(),
             musicbrainz_dump_url: "https://data.metabrainz.org/pub/musicbrainz/data/json-dumps/".to_string(),
-            discogs_health_url: "http://extractor-discogs:8000/health".to_string(),
         }
     }
 }
@@ -76,8 +65,6 @@ impl ExtractorConfig {
         let port = std::env::var("RABBITMQ_PORT").unwrap_or_else(|_| "5672".to_string());
         let amqp_connection = build_amqp_url(&user, &password, &host, &port);
 
-        let discogs_root = PathBuf::from(std::env::var("DISCOGS_ROOT").unwrap_or_else(|_| "/discogs-data".to_string()));
-
         let periodic_check_days = std::env::var("PERIODIC_CHECK_DAYS").unwrap_or_else(|_| "15".to_string()).parse::<u64>().unwrap_or(15).max(1);
 
         let max_workers = std::env::var("MAX_WORKERS")
@@ -88,20 +75,13 @@ impl ExtractorConfig {
 
         let batch_size = std::env::var("BATCH_SIZE").unwrap_or_else(|_| "100".to_string()).parse::<usize>().unwrap_or(100).max(1);
 
-        let data_quality_rules = std::env::var("DATA_QUALITY_RULES").ok().map(PathBuf::from);
-
-        let source = std::env::var("EXTRACTOR_SOURCE").unwrap_or_else(|_| "discogs".to_string()).parse::<Source>().unwrap_or(Source::Discogs);
-
         let musicbrainz_root = PathBuf::from(std::env::var("MUSICBRAINZ_ROOT").unwrap_or_else(|_| "/musicbrainz-data".to_string()));
 
-        let discogs_exchange_prefix = std::env::var("DISCOGS_EXCHANGE_PREFIX").unwrap_or_else(|_| DEFAULT_DISCOGS_EXCHANGE_PREFIX.to_string());
         let musicbrainz_exchange_prefix =
-            std::env::var("MUSICBRAINZ_EXCHANGE_PREFIX").unwrap_or_else(|_| DEFAULT_MUSICBRAINZ_EXCHANGE_PREFIX.to_string());
+            std::env::var("MUSICBRAINZ_EXCHANGE_PREFIX").unwrap_or_else(|_| DEFAULT_EXCHANGE_PREFIX.to_string());
 
         let musicbrainz_dump_url =
             std::env::var("MUSICBRAINZ_DUMP_URL").unwrap_or_else(|_| "https://data.metabrainz.org/pub/musicbrainz/data/json-dumps/".to_string());
-
-        let discogs_health_url = std::env::var("DISCOGS_HEALTH_URL").unwrap_or_else(|_| "http://extractor-discogs:8000/health".to_string());
 
         let health_port = std::env::var("HEALTH_PORT").unwrap_or_else(|_| "8000".to_string()).parse::<u16>().unwrap_or(8000);
         let queue_size = std::env::var("QUEUE_SIZE").unwrap_or_else(|_| "5000".to_string()).parse::<usize>().unwrap_or(5000).max(1);
@@ -111,7 +91,6 @@ impl ExtractorConfig {
 
         Ok(Self {
             amqp_connection,
-            discogs_root,
             periodic_check_days,
             health_port,
             max_workers,
@@ -119,13 +98,9 @@ impl ExtractorConfig {
             queue_size,
             progress_log_interval,
             state_save_interval,
-            data_quality_rules,
-            source,
             musicbrainz_root,
-            discogs_exchange_prefix,
             musicbrainz_exchange_prefix,
             musicbrainz_dump_url,
-            discogs_health_url,
         })
     }
 }
