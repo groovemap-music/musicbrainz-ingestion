@@ -11,6 +11,7 @@ pub mod musicbrainz;
 pub mod polite_http;
 pub mod runtime;
 pub mod state_marker;
+pub mod telemetry;
 pub mod types;
 
 // Stable MusicBrainz provider entry points.

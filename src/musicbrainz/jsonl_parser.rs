@@ -15,12 +15,22 @@ use crate::types::{DataMessage, DataType};
 ///
 /// - Files ending in `.jsonl` are read as plain text.
 /// - All other files (including `.jsonl.xz`, no extension, etc.) are opened with XzDecoder.
-fn open_jsonl_reader(path: &Path) -> Result<BufReader<Box<dyn Read + Send>>> {
+///
+/// `progress_entity` opts the reader into `groovemap.extraction.file.progress`, measured on
+/// the compressed side of the stream. Only the main parse pass passes `Some`: the MBID-map
+/// prepass reads the same file end to end, and reporting both would drive the gauge from 0 to
+/// 1 twice per entity.
+fn open_jsonl_reader(path: &Path, progress_entity: Option<&'static str>) -> Result<BufReader<Box<dyn Read + Send>>> {
     // `path` comes from operator-controlled config (CLI/config file), not HTTP input.
     let file = File::open(path).context(format!("Failed to open file: {:?}", path))?; // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+    let total_bytes = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let counted: Box<dyn Read + Send> = match progress_entity {
+        Some(entity) => Box::new(crate::telemetry::progress_reader(file, total_bytes, entity)),
+        None => Box::new(file),
+    };
     let reader: Box<dyn Read + Send> = match path.extension().and_then(|e| e.to_str()) {
-        Some("jsonl") => Box::new(file),
-        _ => Box::new(XzDecoder::new(file)),
+        Some("jsonl") => counted,
+        _ => Box::new(XzDecoder::new(counted)),
     };
     Ok(BufReader::new(reader))
 }
@@ -286,7 +296,7 @@ pub fn parse_mb_release_group_line(line: &str) -> Result<DataMessage> {
 /// Only lines that contain a Discogs URL relation are added to the map.
 /// Malformed lines are silently skipped.
 pub fn build_mbid_discogs_map_from_file(path: &Path, entity_type: &str) -> Result<HashMap<String, i64>> {
-    let reader = open_jsonl_reader(path).context(format!("Failed to open file for MBID map: {:?}", path))?;
+    let reader = open_jsonl_reader(path, None).context(format!("Failed to open file for MBID map: {:?}", path))?;
 
     let mut map = HashMap::new();
 
@@ -395,7 +405,7 @@ pub fn parse_mb_jsonl_file(
     sender: mpsc::Sender<DataMessage>,
     discogs_map: Option<&HashMap<String, i64>>,
 ) -> Result<u64> {
-    let reader = open_jsonl_reader(path).context(format!("Failed to open JSONL file: {:?}", path))?;
+    let reader = open_jsonl_reader(path, Some(data_type.as_str())).context(format!("Failed to open JSONL file: {:?}", path))?;
 
     let parse_fn: fn(&str) -> Result<DataMessage> = match data_type {
         DataType::Artists => parse_mb_artist_line,
@@ -445,6 +455,7 @@ pub fn parse_mb_jsonl_file(
                 }
             }
             Err(e) => {
+                crate::telemetry::record_error(crate::telemetry::Stage::Parse);
                 debug!("⚠️ Skipping malformed JSONL line: {e}");
             }
         }
