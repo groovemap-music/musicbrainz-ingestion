@@ -430,6 +430,9 @@ impl MbDownloader {
                         let out_path_for_sync = out_path.to_path_buf();
                         let _ = tokio::task::spawn_blocking(move || sync_parent_dir(&out_path_for_sync)).await;
                     }
+                    // Bytes pulled over the network for this entity — the compressed tarball
+                    // stream, counted once the download is known good (SHA256 verified).
+                    crate::telemetry::record_download_bytes(total_bytes);
                     let elapsed = attempt_start.elapsed().as_secs_f64();
                     let speed = if elapsed > 0.0 { (total_bytes as f64 / 1_048_576.0) / elapsed } else { 0.0 };
                     info!(
@@ -455,6 +458,7 @@ impl MbDownloader {
         }
 
         error!("❌ Download failed after {} attempts for {}", MB_MAX_DOWNLOAD_RETRIES, entity);
+        crate::telemetry::record_error(crate::telemetry::Stage::Download);
         Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Download failed after {} attempts", MB_MAX_DOWNLOAD_RETRIES)))
     }
 }

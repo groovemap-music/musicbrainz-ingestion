@@ -21,6 +21,7 @@ use crate::runtime::{
     reset_status_after_failed_check, spawn_shutdown_flag_monitor, wait_for_trigger,
 };
 use crate::state_marker::{PhaseStatus, ProcessingDecision, StateMarker};
+use crate::telemetry;
 use crate::types::{DataMessage, DataType, ExtractionProgress};
 
 pub async fn run_musicbrainz_loop(
@@ -272,6 +273,7 @@ pub async fn process_musicbrainz_data(
                 && status.status == PhaseStatus::Completed
             {
                 info!("✅ Skipping already-completed file: {}", file_name);
+                telemetry::record_file_outcome(telemetry::FileOutcome::Skipped);
                 // Still report the persisted count so a resumed run's extraction_complete
                 // carries true totals for types completed in an earlier session. Without this
                 // the skipped type's key is omitted from the message entirely. (cu2.92)
@@ -399,6 +401,12 @@ pub async fn process_musicbrainz_data(
             }
             s.active_connections.remove(data_type);
         }
+
+        telemetry::record_file_outcome(if file_success {
+            telemetry::FileOutcome::Completed
+        } else {
+            telemetry::FileOutcome::Failed
+        });
 
         record_counts.insert(data_type.to_string(), total_count);
         info!("✅ Completed MusicBrainz {} extraction: {} records", data_type, total_count);

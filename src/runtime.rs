@@ -17,6 +17,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::message_queue::{MessagePublisher, MessageQueue};
 use crate::state_marker::StateMarker;
+use crate::telemetry;
 use crate::types::{DataMessage, DataType, ExtractionProgress};
 
 /// Factory for creating MessagePublisher instances (enables DI for testing)
@@ -130,6 +131,9 @@ pub async fn message_batcher(mut receiver: mpsc::Receiver<DataMessage>, sender: 
                 // Send batch if full
                 if batch.len() >= batch_size {
                     let messages = std::mem::replace(&mut batch, Vec::with_capacity(batch_size));
+                    // Count extracted records once per batch, not once per record: a monthly
+                    // dump is O(100M) records and the total is identical either way.
+                    telemetry::record_records(data_type.as_str(), messages.len() as u64);
                     sender.send(messages).await?;
                     total_batches += 1;
                     last_flush = Instant::now();
@@ -138,6 +142,7 @@ pub async fn message_batcher(mut receiver: mpsc::Receiver<DataMessage>, sender: 
             Ok(None) => {
                 // Channel closed, send remaining messages
                 if !batch.is_empty() {
+                    telemetry::record_records(data_type.as_str(), batch.len() as u64);
                     sender.send(batch).await?;
                     total_batches += 1;
                 }
@@ -147,6 +152,7 @@ pub async fn message_batcher(mut receiver: mpsc::Receiver<DataMessage>, sender: 
                 // Timeout, check if we should flush
                 if !batch.is_empty() && last_flush.elapsed() > Duration::from_secs(1) {
                     let messages = std::mem::replace(&mut batch, Vec::with_capacity(batch_size));
+                    telemetry::record_records(data_type.as_str(), messages.len() as u64);
                     sender.send(messages).await?;
                     total_batches += 1;
                     last_flush = Instant::now();
@@ -181,6 +187,7 @@ pub async fn message_publisher(
             }
             Err(e) => {
                 error!("❌ Failed to publish batch: {}", e);
+                telemetry::record_error(telemetry::Stage::Publish);
                 let mut s = state.write().await;
                 s.error_count += 1;
                 return Err(e).context("Failed to publish batch to AMQP");

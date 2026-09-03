@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use extractor::{config::ExtractorConfig, health::HealthServer, musicbrainz, runtime};
+use extractor::{config::ExtractorConfig, health::HealthServer, musicbrainz, runtime, telemetry};
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
@@ -33,6 +33,11 @@ async fn main() -> Result<()> {
         .json()
         .init();
 
+    // Telemetry bootstrap. Must precede any instrumented code path: the instruments bind
+    // once to whatever MeterProvider is global when they are first touched. Returns None
+    // (and logs once) when no OTLP endpoint is configured — never fails startup.
+    let meter_provider = telemetry::init_metrics(telemetry::DEFAULT_SERVICE_NAME);
+
     // Display ASCII art
     print_ascii_art();
 
@@ -46,6 +51,10 @@ async fn main() -> Result<()> {
     };
 
     info!("{}", startup_banner_message());
+
+    // Every metric carries `source`; this container extracts exactly one provider, so it is
+    // set once here rather than threaded through every call site.
+    telemetry::set_source(telemetry::SOURCE_MUSICBRAINZ);
 
     let config = Arc::new(config);
 
@@ -73,6 +82,10 @@ async fn main() -> Result<()> {
     // Cleanup
     info!("🛑 Shutting down musicbrainz-ingestion...");
     health_handle.abort();
+
+    // Flush the final metric export before the process goes away, on BOTH exit paths — the
+    // failure path below ends in process::exit, which runs no destructors.
+    telemetry::shutdown_metrics(meter_provider).await;
 
     match extraction_result {
         Ok(_) => {

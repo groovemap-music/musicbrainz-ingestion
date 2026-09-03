@@ -9,6 +9,7 @@ use url::Url;
 
 use async_trait::async_trait;
 
+use crate::telemetry;
 use crate::types::{DataMessage, DataType, ExtractionCompleteMessage, FileCompleteMessage, Message};
 
 #[cfg(test)]
@@ -211,12 +212,24 @@ impl MessageQueue {
             .await
             .context("Failed to publish message")?;
 
-        let confirm = Self::await_confirm(publish).await?;
+        // Time only the confirm wait, not serialization or the basic_publish write — this is
+        // the broker-side latency the `groovemap.extraction.publish.confirm.duration`
+        // histogram is meant to show, and the signal that goes flat when RabbitMQ trips a
+        // resource alarm.
+        let confirm_started = std::time::Instant::now();
+        let confirm = Self::await_confirm(publish).await;
+        telemetry::record_publish_confirm(confirm_started.elapsed());
+        let confirm = confirm?;
 
         let acked = confirm.is_ack();
         let returned = confirm.take_message().map(|returned| (returned.reply_code, returned.reply_text.to_string()));
 
-        check_confirmation(exchange_name, acked, returned)
+        let result = check_confirmation(exchange_name, acked, returned);
+        if result.is_ok() {
+            // Only a confirmed, routable message counts as sent.
+            telemetry::record_messages_sent(exchange_name, 1);
+        }
+        result
     }
 
     async fn get_channel(&self) -> Result<Channel> {
@@ -246,6 +259,7 @@ impl MessageQueue {
         }
 
         warn!("⚠️ AMQP channel lost, attempting to reconnect...");
+        telemetry::record_reconnect(telemetry::MESSAGING_SYSTEM_RABBITMQ);
         self.connect().await?;
 
         self.channel.read().await.as_ref().cloned().ok_or_else(|| anyhow::anyhow!("Failed to get channel after reconnection"))
