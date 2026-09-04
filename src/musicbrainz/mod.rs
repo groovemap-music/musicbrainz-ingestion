@@ -5,6 +5,7 @@
 
 pub mod downloader;
 pub mod jsonl_parser;
+pub mod media;
 
 use anyhow::{Context, Result};
 use std::collections::HashMap;
