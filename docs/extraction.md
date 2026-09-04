@@ -76,12 +76,23 @@ normalizer (see the [normalization decision](decisions/0001-producer-normalizati
 No MusicBrainz record is published with an empty `sha256`.
 
 `parse_mb_release_line` additionally publishes `media_raw`: the release's `media` array
-as a position-ordered list of `{format, format_id, position, title, track_count}`
-objects, keys always present (`null` when the source field is absent). This is a
-verbatim, additive capture within contract v1 — MusicBrainz's per-medium `tracks` (and
-`discs`) arrays are never emitted, and releases without media publish an empty list.
-Mapping this raw medium data onto the project's own canonical media taxonomy is a
-separate, later concern (see `contracts/` and its taxonomy decision records).
+as a list of `{format, format_id, position, title, track_count}` objects, keys always
+present (`null` when the source field is absent). Entries preserve the dump's source
+order, which MusicBrainz emits in position order, and are never re-sorted, so `position`
+stays the authority on medium order. This is a verbatim, additive capture within
+contract v1 — MusicBrainz's per-medium `tracks` (and `discs`) arrays are never emitted,
+and releases without media publish an empty list.
+
+`parse_mb_release_line` then attaches the canonical `media` block (ADR 0007), computed
+from `media_raw` plus the release `status`, `packaging`, and release-group primary and
+secondary types against the media taxonomy vendored at
+`contracts/catalog-events/vocab/media-taxonomy.json`. The block is attached before
+`calculate_content_hash`, so the hash covers it; `media_raw` and the raw provider fields
+are untouched and remain the provenance record. Values the vocabulary does not know are
+preserved under `media.unmapped` rather than dropped, so coverage stays measurable. The
+mapper lives in `src/musicbrainz/media.rs` and is held to the conformance fixtures
+vendored at `src/musicbrainz/tests/fixtures/media/`, which the Discogs producer and the
+shared Python mapper must satisfy identically.
 
 `MUSICBRAINZ_DUMP_URL` defaults to the MetaBrainz JSON dump index and
 `MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. `PERIODIC_CHECK_DAYS` controls how
