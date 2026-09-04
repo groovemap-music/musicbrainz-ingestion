@@ -311,6 +311,95 @@ fn test_parse_mb_release_line_invalid_json() {
     assert!(result.is_ok());
 }
 
+// ─── parse_mb_release_line: media_raw ────────────────────────────────────────
+
+#[test]
+fn test_parse_mb_release_line_media_raw_single_cd() {
+    let line = r#"{"id":"release-cd","title":"Single CD Release","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[],"media":[{"format":"CD","format-id":"9712d52a-4509-3d4b-a1a2-67c88c643e31","position":1,"title":null,"track-count":12,"tracks":[{"id":"t1","title":"Track One"}]}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert_eq!(media.len(), 1);
+    assert_eq!(media[0]["format"], "CD");
+    assert_eq!(media[0]["format_id"], "9712d52a-4509-3d4b-a1a2-67c88c643e31");
+    assert_eq!(media[0]["position"], 1);
+    assert!(media[0]["title"].is_null());
+    assert_eq!(media[0]["track_count"], 12);
+    // tracks must never be emitted
+    assert!(media[0].get("tracks").is_none());
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_vinyl_two_mediums_position_order() {
+    // A 2x12" vinyl release: two mediums, each with its own format/title/track-count,
+    // preserved in position order.
+    let line = r#"{"id":"release-vinyl","title":"Double Vinyl Release","barcode":null,"status":"Official","release-group":{"id":"rg-2"},"relations":[],"media":[{"format":"12\" Vinyl","format-id":"fmt-1","position":1,"title":"Side A/B","track-count":6,"tracks":[{"id":"t1"}]},{"format":"12\" Vinyl","format-id":"fmt-1","position":2,"title":"Side C/D","track-count":5,"tracks":[{"id":"t2"}]}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert_eq!(media.len(), 2);
+    assert_eq!(media[0]["position"], 1);
+    assert_eq!(media[0]["title"], "Side A/B");
+    assert_eq!(media[0]["track_count"], 6);
+    assert_eq!(media[1]["position"], 2);
+    assert_eq!(media[1]["title"], "Side C/D");
+    assert_eq!(media[1]["track_count"], 5);
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_digital_media() {
+    let line = r#"{"id":"release-digital","title":"Digital Release","barcode":null,"status":"Official","release-group":{"id":"rg-3"},"relations":[],"media":[{"format":"Digital Media","format-id":"fmt-2","position":1,"title":null,"track-count":10,"tracks":[]}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert_eq!(media.len(), 1);
+    assert_eq!(media[0]["format"], "Digital Media");
+    assert_eq!(media[0]["track_count"], 10);
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_missing_format() {
+    // A medium lacking a `format` key: emit null, not omit the key.
+    let line = r#"{"id":"release-noformat","title":"No Format Release","barcode":null,"status":"Official","release-group":{"id":"rg-4"},"relations":[],"media":[{"position":1,"title":null,"track-count":3,"tracks":[]}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert_eq!(media.len(), 1);
+    assert!(media[0]["format"].is_null());
+    assert!(media[0]["format_id"].is_null());
+    assert_eq!(media[0]["position"], 1);
+    assert_eq!(media[0]["track_count"], 3);
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_no_media_field_emits_empty_list() {
+    let line =
+        r#"{"id":"release-mbid","title":"Unknown Release","barcode":null,"status":"Bootleg","release-group":{"id":"group-mbid"},"relations":[]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert!(media.is_empty());
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_strips_discs() {
+    // `discs` (per-medium disc-id listings) must never be emitted either.
+    let line = r#"{"id":"release-discs","title":"Release With Discs","barcode":null,"status":"Official","release-group":{"id":"rg-5"},"relations":[],"media":[{"format":"CD","format-id":"fmt-3","position":1,"title":null,"track-count":8,"tracks":[],"discs":[{"id":"disc-1","sectors":123456}]}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+    let media = msg.data["media_raw"].as_array().unwrap();
+    assert_eq!(media.len(), 1);
+    assert!(media[0].get("discs").is_none());
+}
+
+#[test]
+fn test_parse_mb_release_line_media_raw_changes_sha256() {
+    let base = r#"{"id":"release-hash","title":"Hash Release","barcode":null,"status":"Official","release-group":{"id":"rg-6"},"relations":[]"#;
+    let line_no_media = format!("{base}}}");
+    let line_with_media =
+        format!(r#"{base},"media":[{{"format":"CD","format-id":"fmt-4","position":1,"title":null,"track-count":9,"tracks":[]}}]}}"#);
+
+    let msg_no_media = parse_mb_release_line(&line_no_media).unwrap();
+    let msg_with_media = parse_mb_release_line(&line_with_media).unwrap();
+
+    assert_ne!(msg_no_media.sha256, msg_with_media.sha256, "sha256 must change when media differ");
+    assert_eq!(msg_with_media.sha256, calculate_content_hash(&msg_with_media.data));
+}
+
 #[test]
 fn test_parse_mb_release_line_true_invalid_json() {
     let result = parse_mb_release_line("definitely not json");
