@@ -3,7 +3,7 @@
 All notable changes to this repository will be recorded here by Commitizen from
 Conventional Commits.
 
-## Unreleased
+## v0.2.1 (2026-09-04)
 
 ### Fix
 
