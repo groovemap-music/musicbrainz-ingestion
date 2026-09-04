@@ -22,7 +22,7 @@ Some names are interfaces rather than product branding and remain unchanged:
 | Identifier | Boundary | Reason retained |
 | --- | --- | --- |
 | `extractor` | Cargo package, executable, and container entrypoint | Renaming it would change build artifacts, local commands, and the image entrypoint without improving the published image identity. |
-| `extractor-discogs`, `extractor-musicbrainz` | Deployment Compose service and network names | `DISCOGS_HEALTH_URL` and deployment-side operations use these addressable runtime names. |
+| `extractor-discogs`, `extractor-musicbrainz` | Deployment Compose service and network names | Deployment-side operations use these addressable runtime names. |
 | `groovemap-discogs-*`, `groovemap-musicbrainz-*` | RabbitMQ exchange names | These are event wire contracts consumed by loaders and enrichers. The configured prefix remains overrideable. |
 | Discogs and MusicBrainz field names | Catalog event payloads | Source-specific names describe upstream provenance and are not legacy product branding. |
 

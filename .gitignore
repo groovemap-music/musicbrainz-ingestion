@@ -1,5 +1,6 @@
 /target/
 /dist/
+__pycache__/
 /lcov.info
 /.mise.local.toml
 /.env
