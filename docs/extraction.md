@@ -26,7 +26,7 @@ flowchart LR
     subgraph MusicBrainz
         MI[Versioned dump index] --> MA[Four tar.xz archives]
         MA --> MC[Streaming checksum verification and JSONL extraction]
-        MC --> MP[Streaming JSONL parser and cross-reference enrichment]
+        MC --> MP[Streaming JSONL parser, cross-reference enrichment, and content hash]
     end
 
     DN --> CE[Catalog event envelope]
@@ -67,6 +67,13 @@ Entity-level Discogs URL relations become these optional cross-reference fields:
 
 Records without a Discogs cross-reference are still published. Storage and graph
 selection policies belong to consumer repositories.
+
+Each of the four JSONL parsers (`parse_mb_artist_line`, `parse_mb_label_line`,
+`parse_mb_release_line`, `parse_mb_release_group_line`) computes the published
+record's SHA-256 content hash from its own final `data` payload, immediately before
+constructing the `DataMessage` — the same `calculate_content_hash` used by Discogs'
+normalizer (see the [normalization decision](decisions/0001-producer-normalization-boundary.md)).
+No MusicBrainz record is published with an empty `sha256`.
 
 `MUSICBRAINZ_DUMP_URL` defaults to the MetaBrainz JSON dump index and
 `MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. `PERIODIC_CHECK_DAYS` controls how

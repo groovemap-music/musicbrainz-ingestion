@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use xz2::read::XzDecoder;
 
-use crate::types::{DataMessage, DataType};
+use crate::types::{DataMessage, DataType, calculate_content_hash};
 
 /// Open a file for line-by-line reading, automatically handling both plain `.jsonl` and
 /// XZ-compressed files based on the file extension.
@@ -152,11 +152,13 @@ fn find_discogs_id(url_rels: &[Value], entity_type: &str) -> Value {
 }
 
 /// Parse a single MusicBrainz JSONL artist line into a [`DataMessage`].
+///
+/// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
+/// immediately before constructing the returned [`DataMessage`] — never left empty.
 pub fn parse_mb_artist_line(line: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse artist JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
-    let sha256 = String::new();
 
     let all_rels = v["relations"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let url_rels = extract_url_rels(all_rels);
@@ -190,15 +192,19 @@ pub fn parse_mb_artist_line(line: &str) -> Result<DataMessage> {
         "external_links": external_links
     });
 
+    let sha256 = calculate_content_hash(&data);
+
     Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
 }
 
 /// Parse a single MusicBrainz JSONL label line into a [`DataMessage`].
+///
+/// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
+/// immediately before constructing the returned [`DataMessage`] — never left empty.
 pub fn parse_mb_label_line(line: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse label JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
-    let sha256 = String::new();
 
     let all_rels = v["relations"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let url_rels = extract_url_rels(all_rels);
@@ -225,16 +231,20 @@ pub fn parse_mb_label_line(line: &str) -> Result<DataMessage> {
         "external_links": external_links
     });
 
+    let sha256 = calculate_content_hash(&data);
+
     Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
 }
 
 /// Partition a flat `relations` array into URL-type relations (those with `"target-type": "url"`).
 /// Parse a single MusicBrainz JSONL release line into a [`DataMessage`].
+///
+/// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
+/// immediately before constructing the returned [`DataMessage`] — never left empty.
 pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse release JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
-    let sha256 = String::new();
 
     let all_rels = v["relations"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let url_rels = extract_url_rels(all_rels);
@@ -257,15 +267,19 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
         "external_links": external_links
     });
 
+    let sha256 = calculate_content_hash(&data);
+
     Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
 }
 
 /// Parse a single MusicBrainz JSONL release-group line into a [`DataMessage`].
+///
+/// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
+/// immediately before constructing the returned [`DataMessage`] — never left empty.
 pub fn parse_mb_release_group_line(line: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse release-group JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
-    let sha256 = String::new();
 
     let all_rels = v["relations"].as_array().map(|a| a.as_slice()).unwrap_or(&[]);
     let url_rels = extract_url_rels(all_rels);
@@ -283,6 +297,8 @@ pub fn parse_mb_release_group_line(line: &str) -> Result<DataMessage> {
         "relations": entity_rels,
         "external_links": external_links
     });
+
+    let sha256 = calculate_content_hash(&data);
 
     Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
 }
