@@ -21,6 +21,14 @@ RUN mkdir src && \
     cargo build --release --locked && \
     rm -rf src
 
+# Copy the vendored media taxonomy consumed at compile time via include_str!
+# in src/musicbrainz/media.rs. Only the vocab subdirectory is copied, not the
+# whole contracts tree, to keep the build context and cache footprint small.
+# `just check` does not build this image, so `just image` is the local gate for
+# any change to a compile-time include under contracts/ — run it before you push;
+# the reusable CI workflow also builds the image on every push.
+COPY contracts/catalog-events/vocab ./contracts/catalog-events/vocab
+
 # Copy actual source code
 COPY src ./src
 
