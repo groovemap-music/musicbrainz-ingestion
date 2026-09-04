@@ -3,6 +3,12 @@
 All notable changes to this repository will be recorded here by Commitizen from
 Conventional Commits.
 
+## Unreleased
+
+### Fix
+
+- **image**: copy the vendored media taxonomy into the builder stage
+
 ## v0.2.0 (2026-09-04)
 
 ### Feat
