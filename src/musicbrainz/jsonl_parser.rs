@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use xz2::read::XzDecoder;
 
+use crate::musicbrainz::media;
 use crate::types::{DataMessage, DataType, calculate_content_hash};
 
 /// Open a file for line-by-line reading, automatically handling both plain `.jsonl` and
@@ -110,6 +111,33 @@ fn extract_entity_rels(relations: &[Value]) -> Vec<Value> {
                 "end_date": rel["end"],
                 "ended": rel["ended"]
             }))
+        })
+        .collect()
+}
+
+/// Extract the raw MusicBrainz `media` array into a bounded list.
+///
+/// Keeps only the structural medium fields — `format`, `format-id`, `position`, `title`,
+/// and `track-count` — normalized to snake_case with every key present (`null` when the
+/// source field is absent). Entries stay in the dump's source order, which MusicBrainz
+/// emits in position order; this function never re-sorts them, so `position` remains the
+/// authority on medium order and a dump that ever broke that correlation would be visible
+/// rather than silently reordered. The `tracks` array (and `discs`) is deliberately never
+/// emitted: raw track listings would blow up payload size for large releases, and
+/// per-track structure is out of scope here. This is a verbatim, additive capture of
+/// what MusicBrainz sent; the canonical mapping onto the project's own taxonomy is the
+/// separate `media` block that [`media::attach_media_block`] computes from it (ADR 0007).
+fn extract_media_raw(media: &[Value]) -> Vec<Value> {
+    media
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "format": m["format"],
+                "format_id": m["format-id"],
+                "position": m["position"],
+                "title": m["title"],
+                "track_count": m["track-count"]
+            })
         })
         .collect()
 }
@@ -254,7 +282,9 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
 
     let release_group_mbid = v["release-group"]["id"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
 
-    let data = serde_json::json!({
+    let media_raw = extract_media_raw(v["media"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
+
+    let mut data = serde_json::json!({
         "discogs_release_id": discogs_release_id,
         "name": v["title"],
         "disambiguation": v["disambiguation"],
@@ -264,8 +294,16 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
         "aliases": v["aliases"],
         "tags": v["tags"],
         "relations": entity_rels,
-        "external_links": external_links
+        "external_links": external_links,
+        "media_raw": media_raw
     });
+
+    // Releases additionally carry the canonical media block (ADR 0007), computed here —
+    // once, at this producer's normalization boundary — from the raw medium list plus the
+    // release status, packaging, and release-group types, all of which stay untouched as the
+    // provenance record. It is attached before the hash so the hash covers it and consumers
+    // detect a vocabulary-driven change.
+    media::attach_media_block(&mut data, &v);
 
     let sha256 = calculate_content_hash(&data);
 

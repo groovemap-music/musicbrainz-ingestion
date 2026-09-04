@@ -5,6 +5,10 @@ Conventional Commits.
 
 ## Unreleased
 
+### Feat
+
+- **contracts**: carry raw mediums and the canonical media block in release fixtures
+
 ### Fix
 
 - **musicbrainz**: compute the content hash for every MusicBrainz event
