@@ -601,7 +601,7 @@ async fn test_message_batcher_empty_input() {
 /// Regression for cu2.41: after a periodic/triggered extraction returns `Err`, the loop must
 /// reset a stuck `Running` status to `Failed`. Without this the status set up-front in
 /// `process_discogs_data` survives an early-`?` error for the whole multi-day periodic sleep,
-/// wedging `/trigger` recovery and starving the MusicBrainz idle-wait.
+/// wedging `/trigger` recovery and misreporting `/health`.
 #[tokio::test]
 async fn test_reset_status_after_failed_check_clears_running() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
@@ -616,7 +616,7 @@ async fn test_reset_status_after_failed_check_clears_running() {
 
 /// The reset lands on `Failed` (not `Running`, not `Completed`) so downstream consumers treat it
 /// as a terminal, recoverable state: health.rs stops returning 409 `already_running`, and
-/// `wait_for_discogs_idle` (which treats only `running` as busy) proceeds.
+/// `/health` no longer misreports a stuck extraction as still `Running`.
 #[tokio::test]
 async fn test_reset_status_after_failed_check_is_not_running() {
     for start in [ExtractionStatus::Running, ExtractionStatus::Completed, ExtractionStatus::Waiting] {
