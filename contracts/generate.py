@@ -17,6 +17,12 @@ CONTRACT_ROOT = EVENTS_ROOT / "v1"
 SCHEMA_PATH = CONTRACT_ROOT / "schemas" / "event.schema.json"
 SOURCE = "musicbrainz"
 
+# The media taxonomy is vendored verbatim from the design repository (see
+# contracts/catalog-events/README.md); it is never generated or rewritten here.
+VOCAB_ROOT = EVENTS_ROOT / "vocab"
+VENDORED_MEDIA_TAXONOMY_PATH = VOCAB_ROOT / "media-taxonomy.json"
+VENDORED_VOCAB_SOURCE_PATH = VOCAB_ROOT / "source.json"
+
 
 def json_text(value: Any) -> str:
     return json.dumps(value, indent=2, sort_keys=True) + "\n"
@@ -131,6 +137,34 @@ def render_all() -> dict[Path, str]:
     return rendered
 
 
+def vendored_vocab_errors() -> list[str]:
+    """Check the vendored media taxonomy against its recorded digest.
+
+    This never writes anything -- it only reports drift so ``contract-check``
+    fails loudly instead of silently accepting a stale or missing vendor copy.
+    """
+    errors: list[str] = []
+    if not VENDORED_VOCAB_SOURCE_PATH.exists():
+        errors.append(f"missing vendor source record: {VENDORED_VOCAB_SOURCE_PATH.relative_to(ROOT)}")
+        return errors
+    try:
+        record = json.loads(VENDORED_VOCAB_SOURCE_PATH.read_text(encoding="utf-8"))
+        expected_digest = record["sha256"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        errors.append(f"invalid vendor source record {VENDORED_VOCAB_SOURCE_PATH.relative_to(ROOT)}: {exc}")
+        return errors
+    if not VENDORED_MEDIA_TAXONOMY_PATH.exists():
+        errors.append(f"missing vendored media taxonomy: {VENDORED_MEDIA_TAXONOMY_PATH.relative_to(ROOT)}")
+        return errors
+    actual_digest = sha256(VENDORED_MEDIA_TAXONOMY_PATH.read_bytes()).hexdigest()
+    if actual_digest != expected_digest:
+        errors.append(
+            f"vendored media taxonomy digest mismatch: {VENDORED_MEDIA_TAXONOMY_PATH.relative_to(ROOT)} "
+            f"has sha256 {actual_digest}, but {VENDORED_VOCAB_SOURCE_PATH.relative_to(ROOT)} records {expected_digest}"
+        )
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
@@ -154,6 +188,11 @@ def main() -> int:
     if stale:
         sys.stderr.write("stale MusicBrainz contract artifacts:\n")
         sys.stderr.write("".join(f"  {path.relative_to(ROOT)}\n" for path in stale))
+        return 1
+    vocab_errors = vendored_vocab_errors()
+    if vocab_errors:
+        sys.stderr.write("vendored media taxonomy is out of date:\n")
+        sys.stderr.write("".join(f"  {error}\n" for error in vocab_errors))
         return 1
     return 0
 
