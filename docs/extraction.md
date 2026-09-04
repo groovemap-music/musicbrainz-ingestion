@@ -75,6 +75,14 @@ constructing the `DataMessage` — the same `calculate_content_hash` used by Dis
 normalizer (see the [normalization decision](decisions/0001-producer-normalization-boundary.md)).
 No MusicBrainz record is published with an empty `sha256`.
 
+`parse_mb_release_line` additionally publishes `media_raw`: the release's `media` array
+as a position-ordered list of `{format, format_id, position, title, track_count}`
+objects, keys always present (`null` when the source field is absent). This is a
+verbatim, additive capture within contract v1 — MusicBrainz's per-medium `tracks` (and
+`discs`) arrays are never emitted, and releases without media publish an empty list.
+Mapping this raw medium data onto the project's own canonical media taxonomy is a
+separate, later concern (see `contracts/` and its taxonomy decision records).
+
 `MUSICBRAINZ_DUMP_URL` defaults to the MetaBrainz JSON dump index and
 `MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. `PERIODIC_CHECK_DAYS` controls how
 often both source loops look for a newer version.

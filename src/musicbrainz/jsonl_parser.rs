@@ -114,6 +114,30 @@ fn extract_entity_rels(relations: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// Extract the raw MusicBrainz `media` array into a bounded, position-ordered list.
+///
+/// Keeps only the structural medium fields — `format`, `format-id`, `position`, `title`,
+/// and `track-count` — normalized to snake_case with every key present (`null` when the
+/// source field is absent). The `tracks` array (and `discs`) is deliberately never
+/// emitted: raw track listings would blow up payload size for large releases, and
+/// per-track structure is out of scope here. This is a verbatim, additive capture of
+/// what MusicBrainz sent; canonical medium/track mapping onto the project's own
+/// taxonomy is a later producer-boundary concern (see ADR 0007).
+fn extract_media_raw(media: &[Value]) -> Vec<Value> {
+    media
+        .iter()
+        .map(|m| {
+            serde_json::json!({
+                "format": m["format"],
+                "format_id": m["format-id"],
+                "position": m["position"],
+                "title": m["title"],
+                "track_count": m["track-count"]
+            })
+        })
+        .collect()
+}
+
 /// Filter URL-rel entries, returning non-Discogs ones as `{"service": ..., "url": ...}` objects.
 pub fn extract_external_links(url_rels: &[Value]) -> Vec<Value> {
     url_rels
@@ -254,6 +278,8 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
 
     let release_group_mbid = v["release-group"]["id"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
 
+    let media_raw = extract_media_raw(v["media"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
+
     let data = serde_json::json!({
         "discogs_release_id": discogs_release_id,
         "name": v["title"],
@@ -264,7 +290,8 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
         "aliases": v["aliases"],
         "tags": v["tags"],
         "relations": entity_rels,
-        "external_links": external_links
+        "external_links": external_links,
+        "media_raw": media_raw
     });
 
     let sha256 = calculate_content_hash(&data);
