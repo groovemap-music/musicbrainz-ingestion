@@ -83,16 +83,24 @@ stays the authority on medium order. This is a verbatim, additive capture within
 contract v1 — MusicBrainz's per-medium `tracks` (and `discs`) arrays are never emitted,
 and releases without media publish an empty list.
 
-`parse_mb_release_line` then attaches the canonical `media` block (ADR 0007), computed
-from `media_raw` plus the release `status`, `packaging`, and release-group primary and
-secondary types against the media taxonomy vendored at
-`contracts/catalog-events/vocab/media-taxonomy.json`. The block is attached before
-`calculate_content_hash`, so the hash covers it; `media_raw` and the raw provider fields
-are untouched and remain the provenance record. Values the vocabulary does not know are
-preserved under `media.unmapped` rather than dropped, so coverage stays measurable. The
-mapper lives in `src/musicbrainz/media.rs` and is held to the conformance fixtures
-vendored at `src/musicbrainz/tests/fixtures/media/`, which the Discogs producer and the
-shared Python mapper must satisfy identically.
+`parse_mb_release_line` then attaches the canonical `media` block ([ADR 0007, "Canonical
+media taxonomy and media-neutral product core"][adr-0007]), computed from `media_raw`
+plus the release `status`, `packaging`, and release-group primary and secondary types
+against the media taxonomy vendored at
+`contracts/catalog-events/vocab/media-taxonomy.json`. Like `media_raw`, `media` is
+additive within contract v1: a consumer built against the v1 schema before this field
+existed keeps working unchanged. The block is attached before `calculate_content_hash`,
+so the hash covers it; `media_raw` and the raw provider fields are untouched and remain
+the provenance record. Values the vocabulary does not know are preserved under
+`media.unmapped` rather than dropped, so coverage stays measurable. The mapper lives in
+`src/musicbrainz/media.rs` and is held to the conformance fixtures vendored at
+`src/musicbrainz/tests/fixtures/media/`, which the Discogs producer and the shared Python
+mapper must satisfy identically. `contracts/catalog-events/definitions/musicbrainz.json`'s
+`releases` fixture carries a worked `media_raw`/`media` example, held in sync with the
+mapper by a test in `src/musicbrainz/tests/media_tests.rs`; see the [contract
+README](../contracts/catalog-events/README.md) for the vendored vocabulary.
+
+[adr-0007]: https://github.com/groovemap-music/design/blob/main/docs/adr/0007-canonical-media-taxonomy.md
 
 `MUSICBRAINZ_DUMP_URL` defaults to the MetaBrainz JSON dump index and
 `MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. `PERIODIC_CHECK_DAYS` controls how
