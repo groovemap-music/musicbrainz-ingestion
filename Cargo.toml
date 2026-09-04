@@ -1,6 +1,6 @@
 [package]
 name = "musicbrainz-ingestion"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 authors = ["Robert Wlodarczyk <robert@simplicityguy.com>"]
 description = "MusicBrainz catalog ingestion and event-contract producer"
