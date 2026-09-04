@@ -68,5 +68,11 @@ Use `just contract` after changing `contracts/catalog-events/definitions/musicbr
 `just image` builds `musicbrainz-ingestion:local`; `just release-dry-run` prepares local
 release evidence without publishing, tagging, or pushing.
 
+`just image` is not part of `just check`; it is the container build gate. Run it yourself
+whenever you touch a compile-time include (such as `include_str!`/`include_bytes!` targets
+under `contracts/`) to confirm the Dockerfile still copies what the build needs — the
+reusable CI workflow builds the image on every push, but that feedback arrives after `just
+check` has already passed locally.
+
 See the [documentation index](docs/README.md) and the [contract guide](contracts/catalog-events/README.md).
 The project is licensed under the [MIT License](LICENSE).
