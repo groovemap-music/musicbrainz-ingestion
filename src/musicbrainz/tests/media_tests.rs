@@ -585,3 +585,34 @@ fn test_hash_covers_a_release_level_change() {
     assert_eq!(bootleg.data["media"]["edition"], json!(["unofficial"]));
     assert_ne!(official.sha256, bootleg.sha256);
 }
+
+// ── Contract fixture parity ─────────────────────────────────────────
+
+/// The `releases` contract fixture (`contracts/catalog-events/definitions/musicbrainz.json`)
+/// carries the raw `media_raw` and `status` a consumer would receive, plus the `media` block
+/// this producer is expected to compute from them. The fixture is hand-authored JSON, not
+/// generated from this mapper, so nothing else stops it drifting from `media.rs` as the
+/// vocabulary or the mapper evolve. Recompute the block from the fixture's own inputs and
+/// demand the fixture still matches, so a drift fails `cargo test` instead of surfacing only
+/// downstream in a consumer.
+#[test]
+fn test_contract_fixture_media_matches_the_mapper() {
+    let definitions_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("contracts/catalog-events/definitions/musicbrainz.json");
+    let text = fs::read_to_string(&definitions_path).expect("the MusicBrainz contract definition is readable");
+    let definitions: Value = serde_json::from_str(&text).expect("the contract definition is valid JSON");
+    let releases = &definitions["fixture_payloads"]["releases"];
+
+    let media_raw = releases["media_raw"].as_array().expect("the releases fixture carries media_raw").clone();
+    let record = json!({"status": releases["status"]});
+    let produced = map(&release_view(&record, &media_raw));
+
+    assert_eq!(
+        &produced,
+        &releases["media"],
+        "contracts/catalog-events/definitions/musicbrainz.json fixture_payloads.releases.media has drifted \
+         from src/musicbrainz/media.rs -- regenerate it from the mapper, don't hand-edit it back into sync\n  \
+         mapper produced: {}\n  fixture carries:  {}",
+        serde_json::to_string_pretty(&produced).unwrap_or_default(),
+        serde_json::to_string_pretty(&releases["media"]).unwrap_or_default()
+    );
+}
