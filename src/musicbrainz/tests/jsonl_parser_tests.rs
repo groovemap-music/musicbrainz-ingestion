@@ -2,6 +2,12 @@
 
 use super::*;
 
+/// Assert `hash` is a well-formed SHA-256 hex digest: 64 lowercase hex characters.
+fn assert_valid_sha256(hash: &str) {
+    assert_eq!(hash.len(), 64, "sha256 must be 64 hex characters, got {} in {:?}", hash.len(), hash);
+    assert!(hash.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()), "sha256 must be lowercase hex: {hash:?}");
+}
+
 // ─── extract_discogs_id ───────────────────────────────────────────────────────
 
 #[test]
@@ -204,8 +210,9 @@ fn test_parse_mb_artist_line_with_discogs() {
     assert_eq!(msg.data["name"], "The Beatles");
     assert_eq!(msg.data["area"], "London");
     assert_eq!(msg.data["begin_area"], "Liverpool");
-    // sha256 should be non-empty
-    assert!(msg.sha256.is_empty(), "Parser should emit empty sha256; content hash is computed post-filter");
+    // sha256 must be the content hash of the final `data` payload, not left empty.
+    assert_eq!(msg.sha256, calculate_content_hash(&msg.data));
+    assert_valid_sha256(&msg.sha256);
     // Check external links include wikipedia but not discogs
     let links = msg.data["external_links"].as_array().unwrap();
     assert_eq!(links.len(), 1);
@@ -322,7 +329,9 @@ fn test_parse_mb_release_group_line_with_discogs() {
     assert_eq!(msg.data["mb_type"], "Album");
     assert_eq!(msg.data["secondary_types"], serde_json::json!(["Compilation"]));
     assert_eq!(msg.data["first_release_date"], "1969-09-26");
-    assert!(msg.sha256.is_empty(), "Parser should emit empty sha256; content hash is computed post-filter");
+    // sha256 must be the content hash of the final `data` payload, not left empty.
+    assert_eq!(msg.sha256, calculate_content_hash(&msg.data));
+    assert_valid_sha256(&msg.sha256);
     let links = msg.data["external_links"].as_array().unwrap();
     assert_eq!(links.len(), 1);
     assert_eq!(links[0]["service"], "wikipedia");
@@ -341,6 +350,75 @@ fn test_parse_mb_release_group_line_no_discogs() {
 fn test_parse_mb_release_group_line_invalid_json() {
     let result = parse_mb_release_group_line("not valid json");
     assert!(result.is_err());
+}
+
+// ─── sha256 content hash: all four entity types ─────────────────────────────
+//
+// Every parser must set `sha256` to `calculate_content_hash(&data)` computed from
+// the final `data` value, right before constructing the `DataMessage` — never an
+// empty string. Each check below covers one entity type: well-formed (64 lowercase
+// hex chars), deterministic for identical input, and different for differing input.
+
+#[test]
+fn test_parse_mb_artist_line_sha256_deterministic_and_differs() {
+    let line_a = r#"{"id":"artist-1","name":"A","sort-name":"A","type":"Person","gender":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
+    let line_b = r#"{"id":"artist-1","name":"B","sort-name":"B","type":"Person","gender":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
+
+    let msg_a1 = parse_mb_artist_line(line_a).unwrap();
+    let msg_a2 = parse_mb_artist_line(line_a).unwrap();
+    let msg_b = parse_mb_artist_line(line_b).unwrap();
+
+    assert_valid_sha256(&msg_a1.sha256);
+    assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
+    assert_eq!(msg_a1.sha256, calculate_content_hash(&msg_a1.data));
+    assert_ne!(msg_a1.sha256, msg_b.sha256, "differing input must hash differently");
+}
+
+#[test]
+fn test_parse_mb_label_line_sha256_deterministic_and_differs() {
+    let line_a = r#"{"id":"label-1","name":"A","type":"Imprint","label-code":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"disambiguation":"","relations":[]}"#;
+    let line_b = r#"{"id":"label-1","name":"B","type":"Imprint","label-code":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"disambiguation":"","relations":[]}"#;
+
+    let msg_a1 = parse_mb_label_line(line_a).unwrap();
+    let msg_a2 = parse_mb_label_line(line_a).unwrap();
+    let msg_b = parse_mb_label_line(line_b).unwrap();
+
+    assert_valid_sha256(&msg_a1.sha256);
+    assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
+    assert_eq!(msg_a1.sha256, calculate_content_hash(&msg_a1.data));
+    assert_ne!(msg_a1.sha256, msg_b.sha256, "differing input must hash differently");
+}
+
+#[test]
+fn test_parse_mb_release_line_sha256_deterministic_and_differs() {
+    let line_a = r#"{"id":"release-1","title":"A","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[]}"#;
+    let line_b = r#"{"id":"release-1","title":"B","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[]}"#;
+
+    let msg_a1 = parse_mb_release_line(line_a).unwrap();
+    let msg_a2 = parse_mb_release_line(line_a).unwrap();
+    let msg_b = parse_mb_release_line(line_b).unwrap();
+
+    assert_valid_sha256(&msg_a1.sha256);
+    assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
+    assert_eq!(msg_a1.sha256, calculate_content_hash(&msg_a1.data));
+    assert_ne!(msg_a1.sha256, msg_b.sha256, "differing input must hash differently");
+}
+
+#[test]
+fn test_parse_mb_release_group_line_sha256_deterministic_and_differs() {
+    let line_a =
+        r#"{"id":"rg-1","title":"A","primary-type":"Album","secondary-types":[],"first-release-date":"2020","disambiguation":"","relations":[]}"#;
+    let line_b =
+        r#"{"id":"rg-1","title":"B","primary-type":"Album","secondary-types":[],"first-release-date":"2020","disambiguation":"","relations":[]}"#;
+
+    let msg_a1 = parse_mb_release_group_line(line_a).unwrap();
+    let msg_a2 = parse_mb_release_group_line(line_a).unwrap();
+    let msg_b = parse_mb_release_group_line(line_b).unwrap();
+
+    assert_valid_sha256(&msg_a1.sha256);
+    assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
+    assert_eq!(msg_a1.sha256, calculate_content_hash(&msg_a1.data));
+    assert_ne!(msg_a1.sha256, msg_b.sha256, "differing input must hash differently");
 }
 
 // ─── parse_mb_jsonl_file (integration via in-memory xz) ─────────────────────
