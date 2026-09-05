@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
-use tracing::{debug, error, info, warn};
+use tracing::{Instrument, debug, error, info, warn};
 use url::Url;
 
 use async_trait::async_trait;
@@ -166,11 +166,26 @@ impl MessageQueue {
         Ok(())
     }
 
+    /// Properties for every published message, carrying the W3C trace context of the
+    /// producer span this is called from.
+    ///
+    /// The header table is attached only when the propagator actually wrote something, so a
+    /// build with traces disabled publishes exactly the frame it published before: the
+    /// global propagator is then the SDK's no-op and the table stays empty.
     fn message_properties() -> BasicProperties {
-        BasicProperties::default()
+        let mut headers = FieldTable::default();
+        telemetry::inject_trace_context(&mut headers);
+
+        let properties = BasicProperties::default()
             .with_content_type("application/json".into())
             .with_content_encoding("UTF-8".into())
-            .with_delivery_mode(2) // Persistent
+            .with_delivery_mode(2); // Persistent
+
+        if headers.inner().is_empty() {
+            properties
+        } else {
+            properties.with_headers(headers)
+        }
     }
 
     /// Await a publisher-confirm under a bounded deadline.
@@ -292,20 +307,33 @@ impl MessagePublisher for MessageQueue {
         let exchange_name = self.exchange_name(data_type);
         let payload = serde_json::to_vec(&message).context("Failed to serialize message")?;
 
-        self.publish_payload(&channel, &exchange_name, &payload).await
+        // A control message (file-complete, extraction-complete) is a batch of one, and gets
+        // the same PRODUCER span as a data batch so every published frame carries a
+        // `traceparent` a consumer can hang its `process` span off.
+        let span = telemetry::publish_span(&exchange_name);
+        self.publish_payload(&channel, &exchange_name, &payload).instrument(span).await
     }
 
     async fn publish_batch(&self, messages: Vec<DataMessage>, data_type: DataType) -> Result<()> {
         let channel = self.get_channel().await?;
         let exchange_name = self.exchange_name(data_type);
 
-        for message in messages {
-            let payload = serde_json::to_vec(&Message::Data(message)).context("Failed to serialize message")?;
+        // One PRODUCER span per BATCH, not per message: a monthly dump is O(100M) records
+        // and a span each would swamp the collector for no added detail. Every message in
+        // the batch is injected with this span's context.
+        let span = telemetry::publish_span(&exchange_name);
 
-            self.publish_payload(&channel, &exchange_name, &payload).await?;
+        async move {
+            for message in messages {
+                let payload = serde_json::to_vec(&Message::Data(message)).context("Failed to serialize message")?;
+
+                self.publish_payload(&channel, &exchange_name, &payload).await?;
+            }
+
+            Ok(())
         }
-
-        Ok(())
+        .instrument(span)
+        .await
     }
 
     async fn send_file_complete(&self, data_type: DataType, file_name: &str, total_processed: u64) -> Result<()> {

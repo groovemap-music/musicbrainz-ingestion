@@ -384,3 +384,38 @@ fn test_confirmation_nack_with_return() {
     let err = check_confirmation("groovemap-discogs-releases", false, Some((312, "NO_ROUTE".to_string()))).expect_err("must fail");
     assert!(err.to_string().contains("unroutable"), "unexpected error: {err}");
 }
+
+/// A publish made from inside a PRODUCER span carries the W3C trace context on the message
+/// properties, and a consumer extracting those headers joins the producer's trace.
+///
+/// There is no way to build a `lapin::Channel` without a broker, so this exercises the
+/// publish path at the seam that actually writes the wire frame: the properties every
+/// `basic_publish` in this module is handed.
+#[test]
+fn test_message_properties_carry_the_trace_context() {
+    use opentelemetry::trace::{TraceContextExt, TracerProvider as _};
+    use opentelemetry_sdk::trace::{InMemorySpanExporter, SdkTracerProvider};
+    use tracing_opentelemetry::OpenTelemetrySpanExt;
+    use tracing_subscriber::layer::SubscriberExt;
+
+    opentelemetry::global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
+
+    let provider = SdkTracerProvider::builder().with_simple_exporter(InMemorySpanExporter::default()).build();
+    let subscriber = tracing_subscriber::registry().with(tracing_opentelemetry::layer().with_tracer(provider.tracer("message-queue-tests")));
+
+    let (properties, trace_id) = tracing::subscriber::with_default(subscriber, || {
+        let span = telemetry::publish_span("groovemap-musicbrainz-artists");
+        let _entered = span.enter();
+        (MessageQueue::message_properties(), span.context().span().span_context().trace_id())
+    });
+
+    let headers = properties.headers().as_ref().expect("a traced publish must carry a header table");
+    assert!(headers.contains_key(telemetry::TRACEPARENT_HEADER), "traceparent must be on the published properties, saw {headers:?}");
+
+    let extracted = telemetry::extract_trace_context(headers);
+    assert_eq!(extracted.span().span_context().trace_id(), trace_id, "a consumer extracting the published headers must join the producer's trace");
+
+    // The rest of the contract is untouched by the injection.
+    assert_eq!(properties.delivery_mode(), &Some(2));
+    assert_eq!(properties.content_type().as_ref().expect("content_type").as_str(), "application/json");
+}
