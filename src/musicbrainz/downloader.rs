@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 use tokio::fs;
-use tracing::{debug, error, info, warn};
+use tracing::{Instrument, debug, error, info, warn};
 
 use crate::polite_http::{PoliteClient, PoliteConfig};
 use crate::types::DataType;
@@ -28,6 +28,13 @@ fn entity_keyword(dt: DataType) -> &'static str {
         DataType::Releases => "release",
         DataType::Masters => "master",
     }
+}
+
+/// Map a dump tarball's entity keyword (`artist`, `release-group`, ...) back onto the
+/// `entity` attribute value the metric and span catalogs use (`artists`, `release-groups`,
+/// ...), so the singular tarball spelling never leaks into a span name.
+fn entity_attribute(entity: &str) -> &'static str {
+    DataType::musicbrainz().into_iter().find(|dt| entity_keyword(*dt) == entity).map(|dt| dt.as_str()).unwrap_or("unknown")
 }
 
 /// Discover available MusicBrainz JSONL dump files in the given directory.
@@ -295,7 +302,18 @@ impl MbDownloader {
 
             let download_url = format!("{}{}/{}", self.base_url, version, tarball_name);
 
-            self.stream_download_verify_extract(&download_url, entity, expected_hash, &out_path).await?;
+            // Acquisition and processing are separate phases of the run, so an entity's
+            // download cannot share a span with its parse — this loop has finished every
+            // entity before the first one is parsed. The download therefore opens its own
+            // `extract {source} {entity}` root, with `download` as its child, and the
+            // processing phase opens a second one for the same entity.
+            let extract_span = crate::telemetry::extract_span(entity_attribute(entity));
+            let download_span = extract_span.in_scope(crate::telemetry::download_span);
+
+            self.stream_download_verify_extract(&download_url, entity, expected_hash, &out_path)
+                .instrument(download_span)
+                .instrument(extract_span)
+                .await?;
 
             info!("✅ Successfully streamed MusicBrainz {} dump to jsonl.xz", entity);
         }

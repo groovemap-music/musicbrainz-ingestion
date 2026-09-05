@@ -6,6 +6,8 @@ use tokio::signal;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tracing::{error, info};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 /// GrooveMap catalog ingestion for MusicBrainz.
 #[derive(Parser, Debug)]
@@ -25,13 +27,25 @@ async fn main() -> Result<()> {
     let log_level = std::env::var("LOG_LEVEL").unwrap_or_else(|_| "INFO".to_string());
     let filter = build_tracing_filter(&log_level);
 
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .with_thread_ids(false)
-        .with_line_number(true)
-        .json()
+    // The traces bootstrap has to run BEFORE the subscriber is installed, because the
+    // OpenTelemetry layer it produces is part of that subscriber. It logs nothing that
+    // survives this ordering, so the resolved state is reported below instead. Returns None
+    // (and never fails startup) when traces are disabled or no endpoint is configured.
+    let trace_provider = telemetry::init_traces(telemetry::DEFAULT_SERVICE_NAME);
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(filter))
+        .with(tracing_subscriber::fmt::layer().with_target(false).with_thread_ids(false).with_line_number(true).json())
+        // `Option<Layer>` is itself a layer: `None` costs nothing per span, so a disabled
+        // trace pipeline leaves the logging path exactly as it was.
+        .with(trace_provider.as_ref().map(telemetry::trace_layer))
         .init();
+
+    if trace_provider.is_some() {
+        info!("🧵 OpenTelemetry traces exporting over OTLP/HTTP-protobuf");
+    } else {
+        info!("📉 OpenTelemetry traces disabled (no OTLP endpoint, or OTEL_TRACES_EXPORTER=none)");
+    }
 
     // Telemetry bootstrap. Must precede any instrumented code path: the instruments bind
     // once to whatever MeterProvider is global when they are first touched. Returns None
@@ -83,9 +97,11 @@ async fn main() -> Result<()> {
     info!("🛑 Shutting down musicbrainz-ingestion...");
     health_handle.abort();
 
-    // Flush the final metric export before the process goes away, on BOTH exit paths — the
-    // failure path below ends in process::exit, which runs no destructors.
+    // Flush the final metric export and the last spans before the process goes away, on
+    // BOTH exit paths — the failure path below ends in process::exit, which runs no
+    // destructors.
     telemetry::shutdown_metrics(meter_provider).await;
+    telemetry::shutdown_traces(trace_provider).await;
 
     match extraction_result {
         Ok(_) => {
