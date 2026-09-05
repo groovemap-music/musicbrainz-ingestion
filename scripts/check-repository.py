@@ -12,7 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AUTOMATION_REVISION = "2f34a4da5c552bc23c75edd3d8d81be0a4b3271c"
+AUTOMATION_REVISION = "eb4312a66bdd55f6b96adb74865e1dccf1c268da"
 
 
 def require(condition: bool, message: str) -> None:

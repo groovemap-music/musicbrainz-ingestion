@@ -74,5 +74,28 @@ under `contracts/`) to confirm the Dockerfile still copies what the build needs 
 reusable CI workflow builds the image on every push, but that feedback arrives after `just
 check` has already passed locally.
 
+### Compiler cache
+
+Builds run `rustc` through [sccache](https://github.com/mozilla/sccache).
+`just bootstrap` installs it with the other mise-managed tools, and
+`.cargo/config.toml` sets `rustc-wrapper = "sccache"`, so every local `cargo`
+invocation reuses previously compiled objects.
+
+Locally the cache lives in sccache's default directory, `~/.cache/sccache` on
+Linux and `~/Library/Caches/Mozilla.sccache` on macOS; set `SCCACHE_DIR` to move
+it. Inside the image the cache lives at `/root/.cache/sccache`, backed by the
+BuildKit cache mount `sccache-musicbrainz-ingestion`, so a second `just image`
+reuses the first build's objects.
+
+```bash
+sccache --show-stats
+```
+
+Set `RUSTC_WRAPPER` to the empty string to build without the cache:
+
+```bash
+RUSTC_WRAPPER= just check
+```
+
 See the [documentation index](docs/README.md) and the [contract guide](contracts/catalog-events/README.md).
 The project is licensed under the [MIT License](LICENSE).

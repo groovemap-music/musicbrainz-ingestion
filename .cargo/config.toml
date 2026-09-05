@@ -1,0 +1,5 @@
+# sccache caches compiled rustc output so repeated local builds reuse objects.
+# `just bootstrap` installs sccache through mise; unset the wrapper with an
+# empty RUSTC_WRAPPER= to bypass it.
+[build]
+rustc-wrapper = "sccache"
