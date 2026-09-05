@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 use tokio::sync::{RwLock, mpsc};
 use tokio::time::{Duration, sleep};
-use tracing::{error, info, warn};
+use tracing::{Instrument, error, info, warn};
 
 use crate::config::ExtractorConfig;
 use crate::runtime::{
@@ -296,6 +296,11 @@ pub async fn process_musicbrainz_data(
             s.active_connections.insert(*data_type, file_name.to_string());
         }
 
+        // The INTERNAL root span for this file's processing. `parse` and every
+        // `publish {destination}` below hang off it, and it stays alive until the whole
+        // pipeline has drained so its duration is the file's, not the spawn's.
+        let extract_span = telemetry::extract_span(data_type.as_str());
+
         // Create channel for parser -> batcher -> publisher pipeline
         let (parse_sender, parse_receiver) = mpsc::channel::<DataMessage>(config.queue_size);
         let (batch_sender, batch_receiver) = mpsc::channel::<Vec<DataMessage>>(100);
@@ -308,7 +313,14 @@ pub async fn process_musicbrainz_data(
         } else {
             None
         };
-        let parser_handle = tokio::task::spawn_blocking(move || parse_mb_jsonl_file(&parser_path, parser_dt, parse_sender, parser_map.as_ref()));
+        // Built here, while the root span is in scope, so it becomes its child; then entered
+        // INSIDE the closure, which is where the parse actually runs — `spawn_blocking` does
+        // not carry the current span across the thread boundary any more than `spawn` does.
+        let parse_span = extract_span.in_scope(telemetry::parse_span);
+        let parser_handle = tokio::task::spawn_blocking(move || {
+            let _entered = parse_span.enter();
+            parse_mb_jsonl_file(&parser_path, parser_dt, parse_sender, parser_map.as_ref())
+        });
 
         // Spawn batcher — share the same state_marker Arc across all iterations
         let batcher_config = BatcherConfig {
@@ -326,7 +338,11 @@ pub async fn process_musicbrainz_data(
         let pub_mq = mq.clone();
         let pub_dt = *data_type;
         let pub_state = state.clone();
-        let publisher_handle = tokio::spawn(async move { message_publisher(batch_receiver, pub_mq, pub_dt, pub_state).await });
+        // The publisher task runs under the root span so each batch's PRODUCER span is a
+        // child of this file's `extract`, not a detached root.
+        let publish_parent = extract_span.clone();
+        let publisher_handle =
+            tokio::spawn(async move { message_publisher(batch_receiver, pub_mq, pub_dt, pub_state).await }.instrument(publish_parent));
 
         // Wait for all stages — use per-file success flag to avoid cross-file bleed
         let mut file_success = true;
@@ -379,7 +395,7 @@ pub async fn process_musicbrainz_data(
         // Completed and the file remains pending on the next run — instead of the
         // signal being silently and permanently dropped for a file the marker
         // already claims is done.
-        if file_success && let Err(e) = mq.send_file_complete(*data_type, file_name, total_count).await {
+        if file_success && let Err(e) = mq.send_file_complete(*data_type, file_name, total_count).instrument(extract_span.clone()).await {
             error!("❌ Failed to send file_complete for {}: {}", data_type, e);
             file_success = false;
             success = false;
