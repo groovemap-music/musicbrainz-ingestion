@@ -11,6 +11,7 @@ default:
 bootstrap:
     mise install --jobs 1
     mise install --jobs 1 {{cargo_audit_tool}} {{cargo_cyclonedx_tool}} {{cargo_deny_tool}} {{cargo_llvm_cov_tool}}
+    sccache --version
 
 setup: bootstrap
     cargo fetch --locked
