@@ -46,14 +46,8 @@ contract-check:
 repository-check:
     mise exec -- python scripts/check-repository.py
 
-publication-history-test:
-    PYTHONDONTWRITEBYTECODE=1 mise exec -- python -m unittest discover -s tests -p 'test_publication_history.py'
-
 repository-tests:
     PYTHONDONTWRITEBYTECODE=1 mise exec -- python -m unittest discover -s tests -p 'test_*.py'
-
-history-rehearsal source-repository output-directory:
-    PLANNING_ARCHIVE_REPO="${PLANNING_ARCHIVE_REPO}" bash scripts/rehearse-publication-history.sh "{{ source-repository }}" "{{ output-directory }}"
 
 build:
     cargo build --release --locked

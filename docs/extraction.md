@@ -1,133 +1,75 @@
-# Extraction architecture
+# MusicBrainz extraction
 
-The `extractor` binary supports two source modes. Each mode owns source acquisition,
-parsing, state tracking, and publication to source-specific RabbitMQ fanout exchanges.
-Consumers are deliberately outside this repository; they depend on the versioned
-[catalog event contract](../contracts/catalog-events/README.md), not on producer source.
-
-Select a mode with `--source discogs|musicbrainz` or `EXTRACTOR_SOURCE`. The default is
-Discogs.
-
-The binary composition root now enters explicit `discogs` or `musicbrainz` modules.
-Those modules own provider acquisition, parsing, transformation, and orchestration.
-Only batching, AMQP publication, health/trigger state, marker persistence, polite HTTP,
-and shutdown mechanics remain provider-neutral runtime services. The legacy
-`extractor` module is an exports-only compatibility surface.
+The `musicbrainz-ingestion` binary has one source: MusicBrainz. It discovers a dump
+version, downloads and verifies the four JSON archives, parses their JSONL records, adds
+MusicBrainz-specific derived fields, and publishes catalog events. There is no source
+selection flag or extraction-rules configuration in this repository.
 
 ```mermaid
 flowchart LR
-    subgraph Discogs
-        DX[Monthly XML dumps] --> DC[Published checksum verification]
-        DC --> DP[Streaming XML parser]
-        DP --> QR[Optional skip, filter, and validation rules]
-        QR --> DN[Always-on normalization and content hash]
-    end
-
-    subgraph MusicBrainz
-        MI[Versioned dump index] --> MA[Four tar.xz archives]
-        MA --> MC[Streaming checksum verification and JSONL extraction]
-        MC --> MP[Streaming JSONL parser, cross-reference enrichment, and content hash]
-    end
-
-    DN --> CE[Catalog event envelope]
-    MP --> CE
-    CE --> MQ[(Source-specific RabbitMQ fanout exchanges)]
+    I[MetaBrainz JSON dump index] --> V[Latest version directory]
+    V --> A[artist.tar.xz]
+    V --> L[label.tar.xz]
+    V --> G[release-group.tar.xz]
+    V --> R[release.tar.xz]
+    A --> D[Verify SHA-256 and extract JSONL]
+    L --> D
+    G --> D
+    R --> D
+    D --> P[MusicBrainz JSONL parsers]
+    P --> H[Derived fields and content hash]
+    H --> Q[(groovemap-musicbrainz exchanges)]
 ```
 
-## Discogs
-
-Discogs mode discovers the newest monthly artists, labels, masters, and releases dumps.
-It downloads missing or changed files, verifies their bytes against the upstream
-`CHECKSUM` file when available, and persists download metadata after each file.
-
-Parsed XML records may pass through the optional [extraction rules
-pipeline](extraction-rules-guide.md). Regardless of whether rules are enabled, every
-published Discogs record passes through the producer normalizer and receives a SHA-256
-content hash computed from the normalized payload. See the [normalization
-decision](decisions/0001-producer-normalization-boundary.md).
-
-## MusicBrainz
-
-MusicBrainz mode discovers the latest `YYYYMMDD-HHMMSS` directory at the configured dump
-URL. For each entity it streams the `.tar.xz` response through SHA-256 verification,
-extracts only the expected `mbdump/<entity>` entry, recompresses it as `.jsonl.xz`, and
-atomically exposes the final file only after verification succeeds. Partial `.tmp` files
-are never treated as complete.
-
-The four downloaded entities are artist, label, release-group, and release. A first pass
-over artists builds an MBID-to-Discogs-ID map used to enrich artist relationship targets.
-Entity-level Discogs URL relations become these optional cross-reference fields:
-
-| MusicBrainz entity | Published cross-reference |
-| --- | --- |
-| artist | `discogs_artist_id` |
-| label | `discogs_label_id` |
-| release group | `discogs_master_id` |
-| release | `discogs_release_id` |
-
-Records without a Discogs cross-reference are still published. Storage and graph
-selection policies belong to consumer repositories.
-
-Each of the four JSONL parsers (`parse_mb_artist_line`, `parse_mb_label_line`,
-`parse_mb_release_line`, `parse_mb_release_group_line`) computes the published
-record's SHA-256 content hash from its own final `data` payload, immediately before
-constructing the `DataMessage` — the same `calculate_content_hash` used by Discogs'
-normalizer (see the [normalization decision](decisions/0001-producer-normalization-boundary.md)).
-No MusicBrainz record is published with an empty `sha256`.
-
-`parse_mb_release_line` additionally publishes `media_raw`: the release's `media` array
-as a list of `{format, format_id, position, title, track_count}` objects, keys always
-present (`null` when the source field is absent). Entries preserve the dump's source
-order, which MusicBrainz emits in position order, and are never re-sorted, so `position`
-stays the authority on medium order. This is a verbatim, additive capture within
-contract v1 — MusicBrainz's per-medium `tracks` (and `discs`) arrays are never emitted,
-and releases without media publish an empty list.
-
-`parse_mb_release_line` then attaches the canonical `media` block ([ADR 0007, "Canonical
-media taxonomy and media-neutral product core"][adr-0007]), computed from `media_raw`
-plus the release `status`, `packaging`, and release-group primary and secondary types
-against the media taxonomy vendored at
-`contracts/catalog-events/vocab/media-taxonomy.json`. Like `media_raw`, `media` is
-additive within contract v1: a consumer built against the v1 schema before this field
-existed keeps working unchanged. The block is attached before `calculate_content_hash`,
-so the hash covers it; `media_raw` and the raw provider fields are untouched and remain
-the provenance record. Values the vocabulary does not know are preserved under
-`media.unmapped` rather than dropped, so coverage stays measurable. The mapper lives in
-`src/musicbrainz/media.rs` and is held to the conformance fixtures vendored at
-`src/musicbrainz/tests/fixtures/media/`, which the Discogs producer and the shared Python
-mapper must satisfy identically. `contracts/catalog-events/definitions/musicbrainz.json`'s
-`releases` fixture carries a worked `media_raw`/`media` example, held in sync with the
-mapper by a test in `src/musicbrainz/tests/media_tests.rs`; see the [contract
-README](../contracts/catalog-events/README.md) for the vendored vocabulary.
-
-[adr-0007]: https://github.com/groovemap-music/design/blob/main/docs/adr/0007-canonical-media-taxonomy.md
+## Acquisition and restart behavior
 
 `MUSICBRAINZ_DUMP_URL` defaults to the MetaBrainz JSON dump index and
-`MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. `PERIODIC_CHECK_DAYS` controls how
-often both source loops look for a newer version.
+`MUSICBRAINZ_ROOT` defaults to `/musicbrainz-data`. Versions use the upstream
+`YYYYMMDD-HHMMSS` directory name. For each entity, the downloader streams the `.tar.xz`
+response through SHA-256 verification, extracts only its expected `mbdump/<entity>`
+entry, recompresses it as `.jsonl.xz`, and atomically exposes the final file after
+verification. Partial `.tmp` files are not complete inputs.
 
-## Published entities
+The service checks for a newer version every `PERIODIC_CHECK_DAYS` days (default 15).
+Pass `--force-reprocess` or set `FORCE_REPROCESS=true` to reprocess the selected version.
+Otherwise the [state marker](state-marker-system.md) skips completed files and resumes an
+incomplete version at file granularity.
 
-Exchange names follow `{prefix}-{entity}` and exchanges are fanout:
+## Parsing and enrichment
 
-| Source | Default prefix | Entities |
-| --- | --- | --- |
-| Discogs | `groovemap-discogs` | `artists`, `labels`, `masters`, `releases` |
-| MusicBrainz | `groovemap-musicbrainz` | `artists`, `labels`, `release-groups`, `releases` |
+The published entities are `artists`, `labels`, `release-groups`, and `releases`. A first
+artist pass builds an MBID-to-Discogs-ID map used only to enrich MusicBrainz relationship
+targets. Entity URL relations may add `discogs_artist_id`, `discogs_label_id`,
+`discogs_master_id`, or `discogs_release_id`; records without those cross-references are
+still published.
 
-Override the prefixes with `DISCOGS_EXCHANGE_PREFIX` and
-`MUSICBRAINZ_EXCHANGE_PREFIX`. The contract is authoritative for names and envelope
-fields.
+Each parser computes `sha256` from its final `data` payload immediately before creating
+the event. Release events additionally include:
 
-## Health and triggers
+- `media_raw`, a source-order copy of MusicBrainz medium metadata without track arrays;
+- `media`, the canonical block mapped with the vendored
+  [`media-taxonomy.json`](../contracts/catalog-events/vocab/media-taxonomy.json).
 
-Each process exposes the configured health port (default `8000`):
+Unknown vocabulary values remain under `media.unmapped`. The mapping implementation is
+`src/musicbrainz/media.rs`, and its conformance fixtures are under
+`src/musicbrainz/tests/fixtures/media/`. See the [catalog event contract](../contracts/catalog-events/README.md)
+for the generated event schema and fixture rules.
 
-- `GET /health` — source progress and current extraction status.
-- `GET /metrics` — machine-readable counters.
-- `GET /ready` — readiness derived from extractor state.
-- `POST /trigger` — request a run; `{"force_reprocess": true}` starts that run from a
-  fresh in-memory marker which replaces the saved version state as work progresses.
+## Publication and HTTP control
 
-Credentials, service URLs, mounted data roots, and container topology are deployment
-concerns and must be supplied outside this repository.
+The default RabbitMQ prefix is `groovemap-musicbrainz`, overrideable with
+`MUSICBRAINZ_EXCHANGE_PREFIX`. Each entity has a fanout exchange named
+`{prefix}-{entity}`. A successful file publishes `file_complete` before its marker is
+made durable as completed; a successful version publishes `extraction_complete` only
+after all four files succeed.
+
+The process listens on `HEALTH_PORT` (default `8000`) and exposes:
+
+- `GET /health` for lifecycle status and per-entity progress;
+- `GET /metrics` for the legacy JSON counters;
+- `GET /ready` for readiness;
+- `POST /trigger` with optional `{"force_reprocess": true}` to request a run.
+
+RabbitMQ credentials, service addresses, mounted data roots, and container topology are
+deployment concerns. This repository does not require or coordinate another ingestion
+producer.
