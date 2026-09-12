@@ -134,7 +134,6 @@ pub fn discover_mb_dump_files(root: &Path) -> Result<HashMap<DataType, PathBuf>>
 /// Tries to extract a YYYYMMDD date from the last component of the directory
 /// path (e.g., `/data/20260322/` -> `"20260322"`).  Falls back to the current
 /// date formatted as `YYYYMMDD`.
-#[allow(dead_code)]
 pub fn detect_mb_dump_version(root: &Path) -> String {
     if let Some(dir_name) = root.file_name().and_then(|n| n.to_str()) {
         // Check if the directory name looks like a YYYYMMDD date
@@ -159,7 +158,6 @@ pub fn detect_mb_dump_version(root: &Path) -> String {
 
 /// Scan `root` for subdirectories matching the MusicBrainz version pattern
 /// (YYYYMMDD-HHMMSS) and return the path to the most recent one.
-#[allow(dead_code)]
 pub fn find_latest_mb_directory(root: &Path) -> Option<PathBuf> {
     let version_pattern = regex::Regex::new(r"^\d{8}-\d{6}$").ok()?;
 
@@ -181,30 +179,31 @@ pub fn find_latest_mb_directory(root: &Path) -> Option<PathBuf> {
 }
 
 /// MusicBrainz entity names for download (singular, matching tarball names)
-#[allow(dead_code)]
 const MB_ENTITIES: &[&str] = &["artist", "label", "release-group", "release"];
 
-#[allow(dead_code)]
 const MB_MAX_DOWNLOAD_RETRIES: u32 = 3;
 
 // Post-connect transport-error retry — see the equivalent comment in
 // `discogs_downloader.rs`. Rate-limit handling lives in `polite_http`.
 #[cfg(not(test))]
-#[allow(dead_code)]
 const MB_RETRY_BASE_DELAY_MS: u64 = 2_000;
 #[cfg(test)]
-#[allow(dead_code)]
 const MB_RETRY_BASE_DELAY_MS: u64 = 10;
 
+fn entity_is_complete(version_dir: &Path, entity: &str) -> bool {
+    // `version_dir` is derived from operator configuration and a validated upstream
+    // version; `entity` comes from the closed MB_ENTITIES set.
+    version_dir.join(format!("{entity}.jsonl")).exists() // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+        || version_dir.join(format!("{entity}.jsonl.xz")).exists() // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+}
+
 /// Result of a MusicBrainz download attempt
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum MbDownloadResult {
     AlreadyCurrent(String),
     Downloaded(String),
 }
 
-#[allow(dead_code)]
 impl MbDownloadResult {
     pub fn version(&self) -> &str {
         match self {
@@ -213,14 +212,12 @@ impl MbDownloadResult {
     }
 }
 
-#[allow(dead_code)]
 pub struct MbDownloader {
     output_directory: PathBuf,
     base_url: String,
     client: PoliteClient,
 }
 
-#[allow(dead_code)]
 impl MbDownloader {
     pub fn new(output_directory: PathBuf, base_url: String) -> Self {
         let mut cfg = PoliteConfig::musicbrainz();
@@ -287,8 +284,7 @@ impl MbDownloader {
             // Without this skip, a run that dies on entity N re-downloads and re-extracts the
             // multi-GB tarballs of entities 1..N-1 on every retry. Both the compressed and bare
             // variants are honored, matching `is_version_complete` and `discover_mb_dump_files`.
-            let plain_path = version_dir.join(format!("{}.jsonl", entity)); // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
-            if out_path.exists() || plain_path.exists() {
+            if entity_is_complete(&version_dir, entity) {
                 info!("⏭️ MusicBrainz {} dump already extracted, skipping re-download", entity);
                 continue;
             }
@@ -333,9 +329,7 @@ impl MbDownloader {
         if !version_dir.is_dir() {
             return false;
         }
-        MB_ENTITIES
-            .iter()
-            .all(|entity| version_dir.join(format!("{}.jsonl", entity)).exists() || version_dir.join(format!("{}.jsonl.xz", entity)).exists())
+        MB_ENTITIES.iter().all(|entity| entity_is_complete(version_dir, entity))
     }
 
     /// Stream a `.tar.xz` from `url` straight through xz decompression, tar extraction, and

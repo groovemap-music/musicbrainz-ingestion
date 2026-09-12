@@ -208,6 +208,14 @@ pub fn init_metrics(service_name: &str) -> Option<SdkMeterProvider> {
 /// SIGKILL.
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
+async fn await_shutdown_task(task: tokio::task::JoinHandle<()>, pipeline: &str) {
+    match tokio::time::timeout(SHUTDOWN_TIMEOUT, task).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => warn!("⚠️ OpenTelemetry {pipeline} shutdown task failed: {e}"),
+        Err(_) => warn!("⚠️ OpenTelemetry {pipeline} shutdown did not finish within {SHUTDOWN_TIMEOUT:?} — exiting anyway"),
+    }
+}
+
 /// Flush and stop the metrics pipeline so the final export lands before the process exits.
 ///
 /// Best-effort and bounded: a failure or a hung collector is logged, never propagated.
@@ -230,11 +238,7 @@ pub async fn shutdown_metrics(provider: Option<SdkMeterProvider>) {
         }
     });
 
-    match tokio::time::timeout(SHUTDOWN_TIMEOUT, flush_and_stop).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => warn!("⚠️ OpenTelemetry shutdown task failed: {}", e),
-        Err(_) => warn!("⚠️ OpenTelemetry shutdown did not finish within {:?} — exiting anyway", SHUTDOWN_TIMEOUT),
-    }
+    await_shutdown_task(flush_and_stop, "metrics").await;
 }
 
 /// `true` when `OTEL_METRICS_EXPORTER` explicitly selects `none`.
@@ -564,11 +568,7 @@ pub async fn shutdown_traces(provider: Option<SdkTracerProvider>) {
         }
     });
 
-    match tokio::time::timeout(SHUTDOWN_TIMEOUT, flush_and_stop).await {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => warn!("⚠️ OpenTelemetry trace shutdown task failed: {}", e),
-        Err(_) => warn!("⚠️ OpenTelemetry trace shutdown did not finish within {:?} — exiting anyway", SHUTDOWN_TIMEOUT),
-    }
+    await_shutdown_task(flush_and_stop, "trace").await;
 }
 
 /// The `tracing` layer that turns this crate's spans into OTEL spans on `provider`.

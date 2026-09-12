@@ -92,6 +92,17 @@ pub struct BatcherConfig {
     pub state_save_interval: usize,
 }
 
+async fn flush_batch(batch: &mut Vec<DataMessage>, capacity: usize, sender: &mpsc::Sender<Vec<DataMessage>>, data_type: DataType) -> Result<bool> {
+    if batch.is_empty() {
+        return Ok(false);
+    }
+
+    let messages = std::mem::replace(batch, Vec::with_capacity(capacity));
+    telemetry::record_records(data_type.as_str(), messages.len() as u64);
+    sender.send(messages).await?;
+    Ok(true)
+}
+
 /// Batch messages for efficient publishing
 pub async fn message_batcher(mut receiver: mpsc::Receiver<DataMessage>, sender: mpsc::Sender<Vec<DataMessage>>, config: BatcherConfig) -> Result<()> {
     let BatcherConfig { batch_size, data_type, state, state_marker, marker_path, file_name, state_save_interval } = config;
@@ -129,30 +140,20 @@ pub async fn message_batcher(mut receiver: mpsc::Receiver<DataMessage>, sender: 
 
                 // Send batch if full
                 if batch.len() >= batch_size {
-                    let messages = std::mem::replace(&mut batch, Vec::with_capacity(batch_size));
-                    // Count extracted records once per batch, not once per record: a monthly
-                    // dump is O(100M) records and the total is identical either way.
-                    telemetry::record_records(data_type.as_str(), messages.len() as u64);
-                    sender.send(messages).await?;
+                    flush_batch(&mut batch, batch_size, &sender, data_type).await?;
                     total_batches += 1;
                     last_flush = Instant::now();
                 }
             }
             Ok(None) => {
-                // Channel closed, send remaining messages
-                if !batch.is_empty() {
-                    telemetry::record_records(data_type.as_str(), batch.len() as u64);
-                    sender.send(batch).await?;
+                if flush_batch(&mut batch, batch_size, &sender, data_type).await? {
                     total_batches += 1;
                 }
                 break;
             }
             Err(_) => {
-                // Timeout, check if we should flush
                 if !batch.is_empty() && last_flush.elapsed() > Duration::from_secs(1) {
-                    let messages = std::mem::replace(&mut batch, Vec::with_capacity(batch_size));
-                    telemetry::record_records(data_type.as_str(), messages.len() as u64);
-                    sender.send(messages).await?;
+                    flush_batch(&mut batch, batch_size, &sender, data_type).await?;
                     total_batches += 1;
                     last_flush = Instant::now();
                 }

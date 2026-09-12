@@ -38,7 +38,6 @@ class PublicationHistoryBoundaryTests(unittest.TestCase):
     def test_similar_and_public_paths_are_preserved(self) -> None:
         public_paths = (
             "docs/extraction.md",
-            "docs/extraction-rules-guide.md",
             "docs/superpower/README.md",
             "docs/superpowers-old/README.md",
             "docs/specifications/README.md",

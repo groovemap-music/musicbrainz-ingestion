@@ -376,23 +376,15 @@ impl StateMarker {
         // (avoids double-counting on retry/resume)
         let already_completed = self.download_phase.downloads_by_file.get(filename).is_some_and(|s| s.status == PhaseStatus::Completed);
 
-        if let Some(status) = self.download_phase.downloads_by_file.get_mut(filename) {
-            status.status = PhaseStatus::Completed;
-            status.bytes_downloaded = bytes;
-            status.completed_at = Some(Utc::now());
-        } else {
-            // If not tracked, create entry
-            self.download_phase.downloads_by_file.insert(
-                filename.to_string(),
-                FileDownloadStatus {
-                    status: PhaseStatus::Completed,
-                    bytes_downloaded: bytes,
-                    started_at: Some(Utc::now()),
-                    completed_at: Some(Utc::now()),
-                    checksum: None,
-                },
-            );
-        }
+        let completed_at = Utc::now();
+        let status = self
+            .download_phase
+            .downloads_by_file
+            .entry(filename.to_string())
+            .or_insert_with(|| FileDownloadStatus { started_at: Some(completed_at), ..Default::default() });
+        status.status = PhaseStatus::Completed;
+        status.bytes_downloaded = bytes;
+        status.completed_at = Some(completed_at);
 
         if !already_completed {
             self.download_phase.files_downloaded += 1;
