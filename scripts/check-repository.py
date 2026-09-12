@@ -207,6 +207,13 @@ require("lcov.info" not in tracked_paths, "generated coverage evidence must not 
 justfile = (ROOT / "Justfile").read_text(encoding="utf-8")
 require("-C link-arg=-fuse-ld=bfd" in justfile, "Linux coverage must override the crashing bundled rust-lld linker")
 require("cargo llvm-cov --all-features --locked --lcov" in justfile, "Rust coverage must remain enabled")
+require("commitizen==4.9.1" in justfile, "version bumps must retain the pinned Commitizen compatibility version")
+require("publication-history-test:" not in justfile, "redundant publication-history-test recipe must stay retired")
+require("history-rehearsal " not in justfile, "one-time history-rehearsal recipe must stay retired")
+check_dependencies = re.search(r"^check:\s*(.+)$", justfile, re.MULTILINE)
+require(check_dependencies is not None, "check recipe is missing")
+for unsafe_recipe in ("audit", "image", "release-dry-run", "history-rehearsal"):
+    require(unsafe_recipe not in check_dependencies.group(1).split(), f"check must not include {unsafe_recipe}")
 rust_toolchain = (ROOT / "rust-toolchain.toml").read_text(encoding="utf-8")
 require("llvm-tools-preview" in rust_toolchain, "the pinned Rust toolchain must install coverage support noninteractively")
 
