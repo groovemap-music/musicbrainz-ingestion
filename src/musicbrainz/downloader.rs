@@ -134,7 +134,6 @@ pub fn discover_mb_dump_files(root: &Path) -> Result<HashMap<DataType, PathBuf>>
 /// Tries to extract a YYYYMMDD date from the last component of the directory
 /// path (e.g., `/data/20260322/` -> `"20260322"`).  Falls back to the current
 /// date formatted as `YYYYMMDD`.
-#[allow(dead_code)]
 pub fn detect_mb_dump_version(root: &Path) -> String {
     if let Some(dir_name) = root.file_name().and_then(|n| n.to_str()) {
         // Check if the directory name looks like a YYYYMMDD date
@@ -159,7 +158,6 @@ pub fn detect_mb_dump_version(root: &Path) -> String {
 
 /// Scan `root` for subdirectories matching the MusicBrainz version pattern
 /// (YYYYMMDD-HHMMSS) and return the path to the most recent one.
-#[allow(dead_code)]
 pub fn find_latest_mb_directory(root: &Path) -> Option<PathBuf> {
     let version_pattern = regex::Regex::new(r"^\d{8}-\d{6}$").ok()?;
 
@@ -181,30 +179,24 @@ pub fn find_latest_mb_directory(root: &Path) -> Option<PathBuf> {
 }
 
 /// MusicBrainz entity names for download (singular, matching tarball names)
-#[allow(dead_code)]
 const MB_ENTITIES: &[&str] = &["artist", "label", "release-group", "release"];
 
-#[allow(dead_code)]
 const MB_MAX_DOWNLOAD_RETRIES: u32 = 3;
 
 // Post-connect transport-error retry — see the equivalent comment in
 // `discogs_downloader.rs`. Rate-limit handling lives in `polite_http`.
 #[cfg(not(test))]
-#[allow(dead_code)]
 const MB_RETRY_BASE_DELAY_MS: u64 = 2_000;
 #[cfg(test)]
-#[allow(dead_code)]
 const MB_RETRY_BASE_DELAY_MS: u64 = 10;
 
 /// Result of a MusicBrainz download attempt
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum MbDownloadResult {
     AlreadyCurrent(String),
     Downloaded(String),
 }
 
-#[allow(dead_code)]
 impl MbDownloadResult {
     pub fn version(&self) -> &str {
         match self {
@@ -213,14 +205,12 @@ impl MbDownloadResult {
     }
 }
 
-#[allow(dead_code)]
 pub struct MbDownloader {
     output_directory: PathBuf,
     base_url: String,
     client: PoliteClient,
 }
 
-#[allow(dead_code)]
 impl MbDownloader {
     pub fn new(output_directory: PathBuf, base_url: String) -> Self {
         let mut cfg = PoliteConfig::musicbrainz();
