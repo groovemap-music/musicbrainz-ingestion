@@ -190,6 +190,13 @@ const MB_RETRY_BASE_DELAY_MS: u64 = 2_000;
 #[cfg(test)]
 const MB_RETRY_BASE_DELAY_MS: u64 = 10;
 
+fn entity_is_complete(version_dir: &Path, entity: &str) -> bool {
+    // `version_dir` is derived from operator configuration and a validated upstream
+    // version; `entity` comes from the closed MB_ENTITIES set.
+    version_dir.join(format!("{entity}.jsonl")).exists() // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+        || version_dir.join(format!("{entity}.jsonl.xz")).exists() // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
+}
+
 /// Result of a MusicBrainz download attempt
 #[derive(Debug)]
 pub enum MbDownloadResult {
@@ -277,8 +284,7 @@ impl MbDownloader {
             // Without this skip, a run that dies on entity N re-downloads and re-extracts the
             // multi-GB tarballs of entities 1..N-1 on every retry. Both the compressed and bare
             // variants are honored, matching `is_version_complete` and `discover_mb_dump_files`.
-            let plain_path = version_dir.join(format!("{}.jsonl", entity)); // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
-            if out_path.exists() || plain_path.exists() {
+            if entity_is_complete(&version_dir, entity) {
                 info!("⏭️ MusicBrainz {} dump already extracted, skipping re-download", entity);
                 continue;
             }
@@ -323,9 +329,7 @@ impl MbDownloader {
         if !version_dir.is_dir() {
             return false;
         }
-        MB_ENTITIES
-            .iter()
-            .all(|entity| version_dir.join(format!("{}.jsonl", entity)).exists() || version_dir.join(format!("{}.jsonl.xz", entity)).exists())
+        MB_ENTITIES.iter().all(|entity| entity_is_complete(version_dir, entity))
     }
 
     /// Stream a `.tar.xz` from `url` straight through xz decompression, tar extraction, and

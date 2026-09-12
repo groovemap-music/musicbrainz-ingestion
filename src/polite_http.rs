@@ -124,13 +124,7 @@ impl PoliteClient {
 
             throttled_attempts += 1;
             let server_wait = parse_retry_after(&response);
-            let chosen_wait = match server_wait {
-                Some(d) => d.min(self.cfg.max_retry_after),
-                None => {
-                    let secs = 30u64.saturating_mul(1u64 << throttled_attempts.saturating_sub(1));
-                    Duration::from_secs(secs).min(self.cfg.max_retry_after)
-                }
-            };
+            let chosen_wait = retry_delay(server_wait, throttled_attempts, self.cfg.max_retry_after);
 
             if throttled_attempts > self.cfg.max_throttle_retries {
                 return Err(anyhow::anyhow!(
@@ -171,6 +165,10 @@ fn parse_retry_after(response: &Response) -> Option<Duration> {
     let header_value = response.headers().get(header::RETRY_AFTER)?;
     let s = header_value.to_str().ok()?;
     s.trim().parse::<u64>().ok().map(Duration::from_secs)
+}
+
+fn retry_delay(server_wait: Option<Duration>, attempt: u32, maximum: Duration) -> Duration {
+    server_wait.unwrap_or_else(|| Duration::from_secs(30u64.saturating_mul(1u64 << attempt.saturating_sub(1)))).min(maximum)
 }
 
 #[cfg(test)]
