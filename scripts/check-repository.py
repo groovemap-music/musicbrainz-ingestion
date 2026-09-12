@@ -60,7 +60,6 @@ def check_conceptual_diagrams() -> None:
     diagram_docs = (
         ROOT / "README.md",
         ROOT / "docs" / "extraction.md",
-        ROOT / "docs" / "extraction-rules-guide.md",
         ROOT / "docs" / "state-marker-system.md",
         ROOT / "docs" / "state-marker-periodic-updates.md",
         ROOT / "docs" / "decisions" / "0001-producer-normalization-boundary.md",
@@ -113,6 +112,36 @@ for path in active_identity_files:
     text = path.read_text(encoding="utf-8").lower()
     require("discogsography" not in text, f"active legacy product identity remains in {path.relative_to(ROOT)}")
 
+maintained_guides = (ROOT / "README.md", *(path for path in (ROOT / "docs").rglob("*.md") if path.name != "publication-readiness.md"))
+for path in maintained_guides:
+    text = path.read_text(encoding="utf-8")
+    require("--source discogs" not in text, f"retired Discogs source selection remains in {path.relative_to(ROOT)}")
+    require("EXTRACTOR_SOURCE" not in text, f"retired dual-source environment variable remains in {path.relative_to(ROOT)}")
+    require("extraction-rules.yaml" not in text, f"nonexistent extraction-rules path remains in {path.relative_to(ROOT)}")
+require(not (ROOT / "docs" / "extraction-rules-guide.md").exists(), "copied Discogs extraction-rules guide must stay removed")
+
+extraction_guide = (ROOT / "docs" / "extraction.md").read_text(encoding="utf-8")
+for documented_interface, implementation, implementation_marker in (
+    ("--force-reprocess", ROOT / "src" / "main.rs", "force_reprocess"),
+    ("FORCE_REPROCESS", ROOT / "src" / "main.rs", "FORCE_REPROCESS"),
+    ("MUSICBRAINZ_DUMP_URL", ROOT / "src" / "config.rs", "MUSICBRAINZ_DUMP_URL"),
+    ("MUSICBRAINZ_ROOT", ROOT / "src" / "config.rs", "MUSICBRAINZ_ROOT"),
+    ("PERIODIC_CHECK_DAYS", ROOT / "src" / "config.rs", "PERIODIC_CHECK_DAYS"),
+    ("MUSICBRAINZ_EXCHANGE_PREFIX", ROOT / "src" / "config.rs", "MUSICBRAINZ_EXCHANGE_PREFIX"),
+    ("HEALTH_PORT", ROOT / "src" / "config.rs", "HEALTH_PORT"),
+    ("/health", ROOT / "src" / "health.rs", "/health"),
+    ("/metrics", ROOT / "src" / "health.rs", "/metrics"),
+    ("/ready", ROOT / "src" / "health.rs", "/ready"),
+    ("/trigger", ROOT / "src" / "health.rs", "/trigger"),
+    ("file_complete", ROOT / "src" / "types.rs", "file_complete"),
+    ("extraction_complete", ROOT / "src" / "types.rs", "extraction_complete"),
+):
+    require(documented_interface in extraction_guide, f"MusicBrainz guide omits {documented_interface}")
+    require(
+        implementation_marker in implementation.read_text(encoding="utf-8"),
+        f"documented interface does not resolve in {implementation.relative_to(ROOT)}: {documented_interface}",
+    )
+
 contract = json.loads((ROOT / "contracts/catalog-events/v1/contract.json").read_text(encoding="utf-8"))
 require(contract["version"] == 1, "unexpected catalog contract version")
 require((ROOT / "contracts/catalog-events/v1/bindings/python/catalog_contract.py").is_file(), "generated Python binding is absent")
@@ -130,8 +159,8 @@ for private_planning in (
         f"private planning material must not be published at {private_planning.relative_to(ROOT)}",
     )
 
-for documentation_index in (ROOT / "README.md", ROOT / "docs" / "README.md"):
-    check_local_markdown_links(documentation_index)
+for maintained_markdown in (ROOT / "README.md", *(ROOT / "docs").rglob("*.md"), *(ROOT / "contracts").rglob("README.md")):
+    check_local_markdown_links(maintained_markdown)
 
 check_conceptual_diagrams()
 
