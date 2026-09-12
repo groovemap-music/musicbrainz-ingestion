@@ -248,14 +248,8 @@ impl MessageQueue {
     }
 
     async fn get_channel(&self) -> Result<Channel> {
-        // Fast path: check if channel is connected under read lock
-        {
-            let channel_guard = self.channel.read().await;
-            if let Some(channel) = &*channel_guard
-                && channel.status().connected()
-            {
-                return Ok(channel.clone());
-            }
+        if let Some(channel) = self.connected_channel().await {
+            return Ok(channel);
         }
 
         // Slow path: serialize reconnection attempts to prevent multiple
@@ -264,13 +258,8 @@ impl MessageQueue {
 
         // Re-check after acquiring the mutex — another caller may have
         // already reconnected while we were waiting.
-        {
-            let channel_guard = self.channel.read().await;
-            if let Some(channel) = &*channel_guard
-                && channel.status().connected()
-            {
-                return Ok(channel.clone());
-            }
+        if let Some(channel) = self.connected_channel().await {
+            return Ok(channel);
         }
 
         warn!("⚠️ AMQP channel lost, attempting to reconnect...");
@@ -278,6 +267,10 @@ impl MessageQueue {
         self.connect().await?;
 
         self.channel.read().await.as_ref().cloned().ok_or_else(|| anyhow::anyhow!("Failed to get channel after reconnection"))
+    }
+
+    async fn connected_channel(&self) -> Option<Channel> {
+        self.channel.read().await.as_ref().filter(|channel| channel.status().connected()).cloned()
     }
 }
 
