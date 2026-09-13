@@ -1,8 +1,7 @@
-//! Provider-neutral runtime services shared by both ingestion paths.
+//! Runtime services shared by the MusicBrainz acquisition and publication paths.
 //!
-//! This module owns only mechanics that have identical semantics for Discogs and
-//! MusicBrainz. Provider acquisition, parsing, transformation, and orchestration
-//! must remain outside this boundary.
+//! Provider acquisition, parsing, transformation, and orchestration remain in the
+//! `musicbrainz` module; this module owns lifecycle, batching, and state mechanics.
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -55,7 +54,7 @@ pub struct ExtractorState {
 /// - `Running` — actively processing a run (set at the top of `process_*_data`)
 /// - `Completed` — transient success state set by `process_*_data` at the end of a run
 /// - `Waiting` — set by `run_*_loop` right before the periodic sleep; the dominant observable
-///   success state during the 5-day wait between checks. Downstream consumers (e.g. the admin
+///   success state during the configured wait between checks. Downstream consumers (e.g. the admin
 ///   dashboard tracker) treat `waiting` as terminal success equivalent to `completed`.
 /// - `Failed` — the last run failed; persists through the sleep window so operators can see it,
 ///   and is overwritten to `Running` when the next attempt begins.
@@ -273,8 +272,8 @@ pub(crate) async fn wait_for_trigger(trigger: &Arc<tokio::sync::Mutex<Option<boo
 /// Reset a stuck `Running` extraction status to `Failed` after a periodic or API-triggered
 /// check returns `Err`.
 ///
-/// `process_discogs_data` / `process_musicbrainz_data` set the status to `Running` up-front but
-/// only reset it on their fall-through tail; any early `?` error short-circuits before that reset,
+/// `process_musicbrainz_data` sets the status to `Running` up-front but only resets it on its
+/// fall-through tail; any early `?` error short-circuits before that reset,
 /// leaving the status at `Running`. The periodic loops swallow the `Err` and sleep for
 /// `periodic_check_days`, so without this backstop the status stays `Running` for the entire sleep —
 /// wedging the manual `/trigger` recovery (health.rs returns 409 `already_running` before enqueuing
@@ -291,8 +290,7 @@ pub(crate) async fn reset_status_after_failed_check(state: &Arc<RwLock<Extractor
 /// `Notify::notified()` consumes its permit and `notify_waiters()` stores none, so long-running
 /// processing code cannot await the `Notify` directly without stealing the signal from the loop's
 /// outer `select!`. The monitor parks on the `Notify` once (before any multi-hour work) and records
-/// the shutdown in a flag that processing code polls between files without side effects. Shared by
-/// both the Discogs and MusicBrainz loops. (cu2.44)
+/// the shutdown in a flag that processing code polls between files without side effects.
 pub(crate) fn spawn_shutdown_flag_monitor(shutdown: Arc<tokio::sync::Notify>) -> Arc<AtomicBool> {
     let flag = Arc::new(AtomicBool::new(false));
     let flag_for_monitor = flag.clone();
@@ -312,8 +310,7 @@ pub(crate) fn spawn_shutdown_flag_monitor(shutdown: Arc<tokio::sync::Notify>) ->
 /// operator-requested SIGTERM would then be logged as a failure and hang ~10 min — long past Docker's
 /// stop grace period, so the container is SIGKILLed instead of stopping cleanly, and orchestrators
 /// that key on exit code may restart the service being stopped. A shutdown must therefore
-/// short-circuit to `Ok(())` BEFORE the failure check. Shared by the Discogs and MusicBrainz initial
-/// runs. (cu2.45)
+/// short-circuit to `Ok(())` BEFORE the failure check.
 pub(crate) fn initial_run_outcome(success: bool, shutdown_requested: bool, source_label: &str) -> Result<()> {
     if shutdown_requested {
         info!("🛑 Shutdown requested during initial {source_label} processing — exiting cleanly");

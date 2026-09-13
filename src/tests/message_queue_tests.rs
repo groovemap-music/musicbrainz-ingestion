@@ -219,7 +219,7 @@ fn test_file_complete_message_serialization_format() {
         data_type: "artists".to_string(),
         timestamp: chrono::Utc::now(),
         total_processed: 42,
-        file: "discogs_20250101_artists.xml.gz".to_string(),
+        file: "artist.jsonl.xz".to_string(),
     };
 
     let message = Message::FileComplete(file_complete_msg);
@@ -229,7 +229,7 @@ fn test_file_complete_message_serialization_format() {
     assert!(json_str.contains(r#""type":"file_complete""#), "Expected type tag, got: {}", json_str);
     assert!(json_str.contains(r#""data_type":"artists""#), "Expected data_type field, got: {}", json_str);
     assert!(json_str.contains(r#""total_processed":42"#), "Expected total_processed field, got: {}", json_str);
-    assert!(json_str.contains(r#""file":"discogs_20250101_artists.xml.gz""#), "Expected file field, got: {}", json_str);
+    assert!(json_str.contains(r#""file":"artist.jsonl.xz""#), "Expected file field, got: {}", json_str);
     assert!(json_str.contains(r#""timestamp""#), "Expected timestamp field, got: {}", json_str);
 }
 
@@ -358,30 +358,30 @@ fn test_publish_options_are_mandatory() {
 #[test]
 fn test_confirmation_ack_without_return() {
     // The healthy case: acked and routed.
-    assert!(check_confirmation("groovemap-discogs-artists", true, None).is_ok());
+    assert!(check_confirmation("groovemap-musicbrainz-artists", true, None).is_ok());
 }
 
 #[test]
 fn test_confirmation_returned_is_failure() {
     // RabbitMQ answers a mandatory publish that matched no queue with basic.return
     // FOLLOWED BY basic.ack — the ack alone must not be read as delivery.
-    let err = check_confirmation("groovemap-discogs-artists", true, Some((312, "NO_ROUTE".to_string())))
+    let err = check_confirmation("groovemap-musicbrainz-artists", true, Some((312, "NO_ROUTE".to_string())))
         .expect_err("an unroutable message must fail the publish");
     let message = err.to_string();
-    assert!(message.contains("groovemap-discogs-artists"), "error should name the exchange: {message}");
+    assert!(message.contains("groovemap-musicbrainz-artists"), "error should name the exchange: {message}");
     assert!(message.contains("NO_ROUTE") && message.contains("312"), "error should carry the broker's reason: {message}");
 }
 
 #[test]
 fn test_confirmation_nack_is_failure() {
-    let err = check_confirmation("groovemap-discogs-artists", false, None).expect_err("a nack must fail the publish");
+    let err = check_confirmation("groovemap-musicbrainz-artists", false, None).expect_err("a nack must fail the publish");
     assert!(err.to_string().contains("not acknowledged"), "unexpected error: {err}");
 }
 
 #[test]
 fn test_confirmation_nack_with_return() {
     // A nack that also carries a returned message reports the routing failure.
-    let err = check_confirmation("groovemap-discogs-releases", false, Some((312, "NO_ROUTE".to_string()))).expect_err("must fail");
+    let err = check_confirmation("groovemap-musicbrainz-releases", false, Some((312, "NO_ROUTE".to_string()))).expect_err("must fail");
     assert!(err.to_string().contains("unroutable"), "unexpected error: {err}");
 }
 

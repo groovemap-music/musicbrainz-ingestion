@@ -1,7 +1,7 @@
-//! Polite HTTP client for upstream data providers (Discogs, MusicBrainz).
+//! Polite HTTP client for the MusicBrainz upstream.
 //!
-//! Discogs and MusicBrainz both publish rate-limit guidance: identify yourself
-//! with a `User-Agent`, throttle to a sustainable request rate, and respect
+//! MusicBrainz publishes rate-limit guidance: identify yourself with a
+//! `User-Agent`, throttle to a sustainable request rate, and respect
 //! `Retry-After` on 429 / 503. A naive `reqwest::get` loop violates all three
 //! and — worse — when paired with a docker `restart: on-failure` policy, every
 //! crash-and-restart slides the limiter window forward and prolongs the cooldown.
@@ -43,24 +43,11 @@ pub struct PoliteConfig {
     /// Idle/read timeout applied to each body read, resetting after a successful
     /// read. Bounds a mid-stream stall (a peer that stops sending bytes without
     /// closing the socket) so the download retry loop can recover, without
-    /// bounding a legitimately long multi-GB transfer (discogsography-cu2.66).
+    /// bounding a legitimately long multi-GB transfer.
     pub read_timeout: Duration,
 }
 
 impl PoliteConfig {
-    /// Defaults tuned for `data.discogs.com` (S3-fronted listing + downloads).
-    /// Discogs has been observed returning multi-thousand-second `Retry-After`
-    /// values, so we accept up to two hours of server-driven backoff.
-    pub fn discogs() -> Self {
-        Self {
-            min_gap: Duration::from_secs(5),
-            max_retry_after: Duration::from_secs(2 * 60 * 60),
-            max_throttle_retries: 5,
-            request_timeout: Duration::from_secs(120),
-            read_timeout: Duration::from_secs(120),
-        }
-    }
-
     /// Defaults tuned for `data.metabrainz.org` (MusicBrainz JSON dumps).
     pub fn musicbrainz() -> Self {
         Self {
@@ -96,7 +83,7 @@ impl PoliteClient {
         //     read — catching a silent mid-stream stall (half-open TCP, LB
         //     idle-drop with no RST) that would otherwise hang `stream.next()`
         //     forever with neither an Ok nor an Err for the retry loop to act on
-        //     (discogsography-cu2.66),
+        //     while still permitting legitimately long streamed downloads,
         //   * the polite-client retry loop handles transient errors,
         //   * the existing per-attempt MAX_DOWNLOAD_RETRIES bounds retries.
         let client = Client::builder()
@@ -338,7 +325,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_timeout_fires_on_mid_stream_stall() {
-        // Regression for discogsography-cu2.66: a peer that sends response
+        // A peer that sends response
         // headers and a few body bytes and then goes silent — without closing
         // the socket (half-open TCP / LB idle-drop with no RST) — used to hang
         // the body read forever, since `stream.next().await` never resolved to

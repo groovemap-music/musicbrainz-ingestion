@@ -167,7 +167,7 @@ pub struct StateMarker {
     /// Last update timestamp
     pub last_updated: DateTime<Utc>,
 
-    /// Discogs data version (e.g., "20260101")
+    /// MusicBrainz dump version (for example, "20260101")
     pub current_version: String,
 
     /// Download phase tracking
@@ -197,9 +197,9 @@ impl StateMarker {
         }
     }
 
-    /// Load state marker from file. Callers only ever pass paths built by `file_path()` /
+    /// Load state marker from file. Callers only ever pass paths built by
     /// `musicbrainz_file_path()` below, which embed `version` as a substring of a fixed
-    /// `.extraction_status_<version>.json` filename under an operator-controlled root — `version`
+    /// `.mb_extraction_status_<version>.json` filename under an operator-controlled root — `version`
     /// itself is always a slash-free basename fragment (see extractor.rs), so this can never
     /// escape the configured root directory.
     pub async fn load(path: &Path) -> Result<Option<Self>> {
@@ -241,12 +241,11 @@ impl StateMarker {
     /// (dirty writeback runs every ~5-30s). The marker then comes back zero-length or
     /// truncated, `load` treats any parse failure as "start fresh", and the extractor
     /// re-downloads and re-publishes a whole multi-GB dump — exactly what the
-    /// tmp+rename design was meant to prevent (discogsography-mm27).
+    /// tmp+rename design was meant to prevent.
     ///
     /// So: fsync the temp file's contents BEFORE the rename, then fsync the parent
-    /// directory AFTER it so the rename itself is durable. The downloader already does
-    /// the equivalent for the dump files it writes (`discogs_downloader.rs`'s
-    /// `sync_data`).
+    /// directory AFTER it so the rename itself is durable. The MusicBrainz downloader
+    /// applies the equivalent durability boundary to the dump files it writes.
     pub async fn save(&mut self, path: &Path) -> Result<()> {
         self.last_updated = Utc::now();
 
@@ -280,14 +279,6 @@ impl StateMarker {
 
         debug!("💾 Saved state marker to: {}", path.display());
         Ok(())
-    }
-
-    /// Get the file path for a Discogs version's state marker.
-    ///
-    /// For MusicBrainz markers, use [`musicbrainz_file_path`] instead — MusicBrainz
-    /// markers live in a versioned subdirectory with a different filename prefix.
-    pub fn file_path(discogs_root: &Path, version: &str) -> PathBuf {
-        discogs_root.join(format!(".extraction_status_{}.json", version))
     }
 
     /// Get the file path for a MusicBrainz version's state marker.
@@ -572,20 +563,12 @@ pub enum ProcessingDecision {
     Skip,
 }
 
-/// Extract data type from filename.
-///
-/// Handles both Discogs filenames (e.g., "discogs_20260101_artists.xml.gz" -> "artists")
-/// and MusicBrainz filenames (e.g., "artist.jsonl.xz" -> "artists").
+/// Extract an entity type from a MusicBrainz JSONL filename.
 ///
 /// MusicBrainz filenames use singular forms (artist, label, release, release-group)
 /// which are normalized to plural to match `DataType::as_str()`.
 fn extract_data_type(filename: &str) -> Option<String> {
-    // Try Discogs format first: third underscore-delimited segment
-    if let Some(data_type) = filename.split('_').nth(2).and_then(|s| s.split('.').next()) {
-        return Some(data_type.to_string());
-    }
-    // MusicBrainz format: no underscores, contains ".jsonl"
-    // Normalize singular to plural to match DataType::as_str()
+    // Normalize singular MusicBrainz names to the plural event vocabulary.
     if !filename.contains('_') && filename.contains(".jsonl") {
         return filename.split('.').next().filter(|s| !s.is_empty()).map(|s| {
             // Strip optional "mbdump-" prefix before matching singular to plural
