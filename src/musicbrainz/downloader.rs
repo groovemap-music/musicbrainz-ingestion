@@ -183,8 +183,7 @@ const MB_ENTITIES: &[&str] = &["artist", "label", "release-group", "release"];
 
 const MB_MAX_DOWNLOAD_RETRIES: u32 = 3;
 
-// Post-connect transport-error retry — see the equivalent comment in
-// `discogs_downloader.rs`. Rate-limit handling lives in `polite_http`.
+// Post-connect transport-error retry. Rate-limit handling lives in `polite_http`.
 #[cfg(not(test))]
 const MB_RETRY_BASE_DELAY_MS: u64 = 2_000;
 #[cfg(test)]

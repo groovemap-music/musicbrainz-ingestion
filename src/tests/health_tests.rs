@@ -218,7 +218,7 @@ async fn test_ready_handler_transitions() {
     // Add a completed file — should become ready
     {
         let mut s = state.write().await;
-        s.completed_files.insert("discogs_20260101_artists.xml.gz".to_string());
+        s.completed_files.insert("artist.jsonl.xz".to_string());
     }
     let status = ready_handler(State((state.clone(), trigger))).await;
     assert_eq!(status, StatusCode::OK);

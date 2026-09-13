@@ -84,7 +84,8 @@ pub struct MessageQueue {
 }
 
 impl MessageQueue {
-    /// Build the fanout exchange name for a given data type (e.g. "groovemap-discogs-artists")
+    /// Build the fanout exchange name for a given data type (for example,
+    /// `groovemap-musicbrainz-artists`).
     fn exchange_name(&self, data_type: DataType) -> String {
         format!("{}-{}", self.exchange_prefix, data_type)
     }

@@ -112,7 +112,8 @@ async fn main() -> Result<()> {
             error!("❌ musicbrainz-ingestion failed: {}", e);
             // Sleep before exiting so docker-compose's `restart: on-failure`
             // policy can't flap us through a rate-limit window. The polite
-            // client already absorbs single Retry-After cooldowns up to 2h;
+            // client already absorbs single Retry-After cooldowns up to the
+            // configured limit (30 minutes by default);
             // this cooldown is a backstop for the residual case where the
             // failure cause is something the client can't retry past
             // (cap exceeded, network error, etc.).

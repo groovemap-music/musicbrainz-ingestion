@@ -22,8 +22,8 @@ fn test_download_phase_lifecycle() {
     assert!(marker.download_phase.started_at.is_some());
 
     // Download files
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 1000);
-    marker.file_downloaded("discogs_20260101_labels.xml.gz", 2000);
+    marker.file_downloaded("artist.jsonl.xz", 1000);
+    marker.file_downloaded("label.jsonl.xz", 2000);
     assert_eq!(marker.download_phase.files_downloaded, 2);
     assert_eq!(marker.download_phase.bytes_downloaded, 3000);
     assert_eq!(marker.download_phase.downloads_by_file.len(), 2);
@@ -45,26 +45,26 @@ fn test_processing_phase_lifecycle() {
     assert_eq!(marker.summary.overall_status, PhaseStatus::InProgress);
 
     // Process file
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    assert_eq!(marker.processing_phase.current_file, Some("discogs_20260101_artists.xml.gz".to_string()));
+    marker.start_file_processing("artist.jsonl.xz");
+    assert_eq!(marker.processing_phase.current_file, Some("artist.jsonl.xz".to_string()));
 
     // Update progress - should update phase totals and publishing metrics
-    marker.update_file_progress("discogs_20260101_artists.xml.gz", 100, 100, 2);
+    marker.update_file_progress("artist.jsonl.xz", 100, 100, 2);
     assert_eq!(marker.processing_phase.records_extracted, 100); // Should sum from progress_by_file
     assert_eq!(marker.processing_phase.files_processed, 0); // No files completed yet
     assert_eq!(marker.publishing_phase.messages_published, 100); // Should aggregate from files
     assert_eq!(marker.publishing_phase.batches_sent, 2); // Should aggregate from files
 
     // Start another file
-    marker.start_file_processing("discogs_20260101_labels.xml.gz");
-    marker.update_file_progress("discogs_20260101_labels.xml.gz", 50, 50, 1);
+    marker.start_file_processing("label.jsonl.xz");
+    marker.update_file_progress("label.jsonl.xz", 50, 50, 1);
     assert_eq!(marker.processing_phase.records_extracted, 150); // 100 + 50
     assert_eq!(marker.processing_phase.files_processed, 0); // Still no files completed
     assert_eq!(marker.publishing_phase.messages_published, 150); // 100 + 50
     assert_eq!(marker.publishing_phase.batches_sent, 3); // 2 + 1
 
     // Complete first file - this increments files_processed
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 100);
+    marker.complete_file_processing("artist.jsonl.xz", 100);
     assert_eq!(marker.processing_phase.files_processed, 1); // Now 1 file completed
     assert_eq!(marker.processing_phase.records_extracted, 150); // Still 150 total (complete doesn't add, it's already counted)
 
@@ -101,31 +101,23 @@ fn test_should_process_decisions() {
 fn test_pending_files() {
     let mut marker = StateMarker::new("20260101".to_string());
 
-    let all_files = vec![
-        "discogs_20260101_artists.xml.gz".to_string(),
-        "discogs_20260101_labels.xml.gz".to_string(),
-        "discogs_20260101_masters.xml.gz".to_string(),
-    ];
+    let all_files = vec!["artist.jsonl.xz".to_string(), "label.jsonl.xz".to_string(), "release-group.jsonl.xz".to_string()];
 
     // All pending initially
     let pending = marker.pending_files(&all_files);
     assert_eq!(pending.len(), 3);
 
     // Mark one as completed
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 100);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 100);
 
     let pending = marker.pending_files(&all_files);
     assert_eq!(pending.len(), 2);
-    assert!(!pending.contains(&"discogs_20260101_artists.xml.gz".to_string()));
+    assert!(!pending.contains(&"artist.jsonl.xz".to_string()));
 }
 
 #[test]
 fn test_extract_data_type() {
-    assert_eq!(extract_data_type("discogs_20260101_artists.xml.gz"), Some("artists".to_string()));
-    assert_eq!(extract_data_type("discogs_20260101_labels.xml.gz"), Some("labels".to_string()));
-    assert_eq!(extract_data_type("discogs_20260101_masters.xml.gz"), Some("masters".to_string()));
-    assert_eq!(extract_data_type("discogs_20260101_releases.xml.gz"), Some("releases".to_string()));
     // MusicBrainz JSONL filenames — normalized to plural to match DataType::as_str()
     assert_eq!(extract_data_type("artist.jsonl.xz"), Some("artists".to_string()));
     assert_eq!(extract_data_type("label.jsonl.xz"), Some("labels".to_string()));
@@ -133,14 +125,15 @@ fn test_extract_data_type() {
     assert_eq!(extract_data_type("release-group.jsonl.xz"), Some("release-groups".to_string()));
     // Unknown MusicBrainz entity type — passes through unchanged
     assert_eq!(extract_data_type("area.jsonl.xz"), Some("area".to_string()));
-    // Non-matching filenames
+    // Non-MusicBrainz and non-matching filenames do not create summary keys.
+    assert_eq!(extract_data_type("discogs_20260101_artists.xml.gz"), None);
     assert_eq!(extract_data_type("invalid.xml.gz"), None);
 }
 
 #[test]
 fn test_file_path_generation() {
-    let path = StateMarker::file_path(Path::new("/discogs-data"), "20260101");
-    assert_eq!(path, PathBuf::from("/discogs-data/.extraction_status_20260101.json"));
+    let path = StateMarker::musicbrainz_file_path(Path::new("/musicbrainz-data"), "20260101");
+    assert_eq!(path, PathBuf::from("/musicbrainz-data/20260101/.mb_extraction_status_20260101.json"));
 }
 
 #[test]
@@ -162,7 +155,7 @@ fn test_complete_extraction() {
 async fn test_serialization() {
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_download(4);
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 1000);
+    marker.file_downloaded("artist.jsonl.xz", 1000);
 
     let json = serde_json::to_string_pretty(&marker).unwrap();
     let deserialized: StateMarker = serde_json::from_str(&json).unwrap();
@@ -205,7 +198,7 @@ async fn test_load_and_save_roundtrip() {
     // Create and save a marker
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_download(4);
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 1000);
+    marker.file_downloaded("artist.jsonl.xz", 1000);
     marker.save(path).await.unwrap();
 
     // Load it back
@@ -227,7 +220,7 @@ async fn test_atomic_save_no_temp_file_remains() {
 
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_download(2);
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 1000);
+    marker.file_downloaded("artist.jsonl.xz", 1000);
 
     // Save to a path with .json extension
     marker.save(&marker_path).await.unwrap();
@@ -253,18 +246,18 @@ fn test_complete_file_processing_syncs_messages_with_records() {
     let mut marker = StateMarker::new("20260101".to_string());
 
     // Start file processing
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
+    marker.start_file_processing("artist.jsonl.xz");
 
     // Simulate periodic updates with different record/message counts
-    marker.update_file_progress("discogs_20260101_artists.xml.gz", 1000, 950, 10);
+    marker.update_file_progress("artist.jsonl.xz", 1000, 950, 10);
 
     // Complete file processing with final record count
     let final_records = 1250;
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", final_records);
+    marker.complete_file_processing("artist.jsonl.xz", final_records);
 
     // Verify records are set to the final count, but messages_published
     // preserves the batcher-tracked value (950) since it was already non-zero
-    let status = marker.processing_phase.progress_by_file.get("discogs_20260101_artists.xml.gz").unwrap();
+    let status = marker.processing_phase.progress_by_file.get("artist.jsonl.xz").unwrap();
     assert_eq!(status.records_extracted, final_records);
     assert_eq!(status.messages_published, 950, "messages_published should preserve the batcher-tracked value when non-zero");
 }
@@ -277,17 +270,17 @@ fn test_file_downloaded_tracks_bytes() {
     marker.start_download(2);
 
     // Download files with actual byte counts
-    marker.start_file_download("discogs_20260101_artists.xml.gz");
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 480351382);
+    marker.start_file_download("artist.jsonl.xz");
+    marker.file_downloaded("artist.jsonl.xz", 480351382);
 
-    marker.start_file_download("discogs_20260101_labels.xml.gz");
-    marker.file_downloaded("discogs_20260101_labels.xml.gz", 86848860);
+    marker.start_file_download("label.jsonl.xz");
+    marker.file_downloaded("label.jsonl.xz", 86848860);
 
     // Verify individual file byte counts
-    let artists_status = marker.download_phase.downloads_by_file.get("discogs_20260101_artists.xml.gz").unwrap();
+    let artists_status = marker.download_phase.downloads_by_file.get("artist.jsonl.xz").unwrap();
     assert_eq!(artists_status.bytes_downloaded, 480351382, "artists file should track actual bytes downloaded");
 
-    let labels_status = marker.download_phase.downloads_by_file.get("discogs_20260101_labels.xml.gz").unwrap();
+    let labels_status = marker.download_phase.downloads_by_file.get("label.jsonl.xz").unwrap();
     assert_eq!(labels_status.bytes_downloaded, 86848860, "labels file should track actual bytes downloaded");
 
     // Verify total bytes downloaded
@@ -301,9 +294,9 @@ fn test_file_downloaded_without_prior_tracking() {
     marker.start_download(1);
 
     // Call file_downloaded without calling start_file_download first
-    marker.file_downloaded("discogs_20260101_artists.xml.gz", 5000);
+    marker.file_downloaded("artist.jsonl.xz", 5000);
 
-    let status = marker.download_phase.downloads_by_file.get("discogs_20260101_artists.xml.gz").unwrap();
+    let status = marker.download_phase.downloads_by_file.get("artist.jsonl.xz").unwrap();
     assert_eq!(status.status, PhaseStatus::Completed);
     assert_eq!(status.bytes_downloaded, 5000);
     assert!(status.started_at.is_some());
@@ -327,14 +320,14 @@ fn test_sync_phase_totals_multiple_files() {
     marker.start_processing(3);
 
     // Start and update three files
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.update_file_progress("discogs_20260101_artists.xml.gz", 200, 200, 4);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.update_file_progress("artist.jsonl.xz", 200, 200, 4);
 
-    marker.start_file_processing("discogs_20260101_labels.xml.gz");
-    marker.update_file_progress("discogs_20260101_labels.xml.gz", 300, 300, 6);
+    marker.start_file_processing("label.jsonl.xz");
+    marker.update_file_progress("label.jsonl.xz", 300, 300, 6);
 
-    marker.start_file_processing("discogs_20260101_releases.xml.gz");
-    marker.update_file_progress("discogs_20260101_releases.xml.gz", 500, 500, 10);
+    marker.start_file_processing("release.jsonl.xz");
+    marker.update_file_progress("release.jsonl.xz", 500, 500, 10);
 
     // Verify aggregated totals
     assert_eq!(marker.processing_phase.records_extracted, 1000);
@@ -357,8 +350,8 @@ fn test_complete_extraction_without_download_start() {
     // Never start download, so download_phase.started_at is None
     // Start and complete processing directly
     marker.start_processing(1);
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 100);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 100);
     marker.complete_processing();
     marker.complete_extraction();
 
@@ -379,10 +372,10 @@ async fn test_resume_preserves_original_processing_start_time() {
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_processing(4);
     let original_started_at = marker.processing_phase.started_at.expect("started_at set on start_processing");
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 9_000_000);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 9_000_000);
 
-    // Marker is still InProgress — releases/labels/masters never finished.
+    // Marker is still InProgress — releases, labels, and release groups never finished.
     assert_eq!(marker.processing_phase.status, PhaseStatus::InProgress);
 
     // Persist across the restart (serialize -> deserialize like load/save on disk).
@@ -404,13 +397,13 @@ async fn test_resume_preserves_original_processing_start_time() {
 
     // The already-completed artists file is not re-sent this session.
     let all_files = vec![
-        "discogs_20260101_artists.xml.gz".to_string(),
-        "discogs_20260101_labels.xml.gz".to_string(),
-        "discogs_20260101_masters.xml.gz".to_string(),
-        "discogs_20260101_releases.xml.gz".to_string(),
+        "artist.jsonl.xz".to_string(),
+        "label.jsonl.xz".to_string(),
+        "release-group.jsonl.xz".to_string(),
+        "release.jsonl.xz".to_string(),
     ];
     let pending = resumed.pending_files(&all_files);
-    assert!(!pending.contains(&"discogs_20260101_artists.xml.gz".to_string()));
+    assert!(!pending.contains(&"artist.jsonl.xz".to_string()));
 }
 
 // Regression: discogsography-cu2.2 — the "all files already processed" completion path
@@ -422,15 +415,15 @@ async fn test_all_files_complete_before_crash_keeps_original_start_time() {
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_processing(1);
     let original_started_at = marker.processing_phase.started_at.unwrap();
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 9_000_000);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 9_000_000);
 
     // Persist and "restart" before the completion broadcast was sent.
     let json = serde_json::to_string_pretty(&marker).unwrap();
     let resumed: StateMarker = serde_json::from_str(&json).unwrap();
 
     // No files remain to process — the "all files already processed" branch runs.
-    let all_files = vec!["discogs_20260101_artists.xml.gz".to_string()];
+    let all_files = vec!["artist.jsonl.xz".to_string()];
     assert!(resumed.pending_files(&all_files).is_empty());
 
     // extraction_complete on this branch must still use the original start time.
@@ -445,9 +438,9 @@ async fn test_all_files_complete_before_crash_keeps_original_start_time() {
 fn test_interrupted_download_retains_progress() {
     let mut marker = StateMarker::new("20260801".to_string());
 
-    // Run 1: artists + labels + masters processed, releases still pending.
+    // Run 1: artists, labels, and release groups processed; releases still pending.
     marker.start_processing(4);
-    for file in ["discogs_20260801_artists.xml.gz", "discogs_20260801_labels.xml.gz", "discogs_20260801_masters.xml.gz"] {
+    for file in ["artist.jsonl.xz", "label.jsonl.xz", "release-group.jsonl.xz"] {
         marker.start_file_processing(file);
         marker.complete_file_processing(file, 1000);
     }
@@ -461,12 +454,12 @@ fn test_interrupted_download_retains_progress() {
     assert_eq!(marker.should_process(), ProcessingDecision::Continue);
 
     let all_files = vec![
-        "discogs_20260801_artists.xml.gz".to_string(),
-        "discogs_20260801_labels.xml.gz".to_string(),
-        "discogs_20260801_masters.xml.gz".to_string(),
-        "discogs_20260801_releases.xml.gz".to_string(),
+        "artist.jsonl.xz".to_string(),
+        "label.jsonl.xz".to_string(),
+        "release-group.jsonl.xz".to_string(),
+        "release.jsonl.xz".to_string(),
     ];
-    assert_eq!(marker.pending_files(&all_files), vec!["discogs_20260801_releases.xml.gz".to_string()]);
+    assert_eq!(marker.pending_files(&all_files), vec!["release.jsonl.xz".to_string()]);
 }
 
 /// Same protection for a download phase that recorded an outright failure: downloads
@@ -476,8 +469,8 @@ fn test_interrupted_download_retains_progress() {
 fn test_failed_download_keeps_progress() {
     let mut marker = StateMarker::new("20260801".to_string());
     marker.start_processing(2);
-    marker.start_file_processing("discogs_20260801_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260801_artists.xml.gz", 500);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 500);
 
     marker.download_phase.status = PhaseStatus::Failed;
 
@@ -496,7 +489,7 @@ fn test_interrupted_download_no_progress() {
 
     // An in-flight (not yet completed) file is not progress either.
     marker.start_processing(4);
-    marker.start_file_processing("discogs_20260801_artists.xml.gz");
+    marker.start_file_processing("artist.jsonl.xz");
     assert_eq!(marker.completed_file_count(), 0);
     assert_eq!(marker.should_process(), ProcessingDecision::Reprocess);
 }
@@ -522,10 +515,10 @@ fn test_redownloaded_bytes_requeue_that_file() {
     // trusted bytes were wrong, the Completed processing status computed from those bad
     // bytes must not survive — otherwise pending_files() skips the corrected file, the run
     // finalizes Completed, and the corrected data is never parsed or published.
-    let file = "discogs_20260101_artists.xml.gz";
+    let file = "artist.jsonl.xz";
     let mut marker = marker_with_processed_file(file, "checksum-of-corrupt-bytes", 500);
 
-    let all_files = vec![file.to_string(), "discogs_20260101_labels.xml.gz".to_string()];
+    let all_files = vec![file.to_string(), "label.jsonl.xz".to_string()];
     assert!(!marker.pending_files(&all_files).contains(&file.to_string()), "precondition: the file starts out completed");
 
     let invalidated = marker.file_bytes_verified(file, "checksum-of-corrected-bytes");
@@ -539,9 +532,9 @@ fn test_redownloaded_bytes_requeue_that_file() {
 
 #[test]
 fn test_identical_redownload_keeps_completion() {
-    // The narrow counterpart: an operator deleting a processed .xml.gz to reclaim disk gets
+    // The narrow counterpart: an operator deleting a processed .jsonl.xz to reclaim disk gets
     // the same bytes back, which must NOT force a needless multi-GB reparse.
-    let file = "discogs_20260101_artists.xml.gz";
+    let file = "artist.jsonl.xz";
     let mut marker = marker_with_processed_file(file, "same-checksum", 500);
 
     let invalidated = marker.file_bytes_verified(file, "same-checksum");
@@ -556,7 +549,7 @@ fn test_identical_redownload_keeps_completion() {
 fn test_unknown_provenance_keeps_completed() {
     // A marker written before source_checksum existed has unknown provenance; leave it alone
     // rather than speculatively re-processing every file on the next run.
-    let file = "discogs_20260101_artists.xml.gz";
+    let file = "artist.jsonl.xz";
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_processing(1);
     marker.start_file_processing(file);
@@ -573,7 +566,7 @@ fn test_unknown_provenance_keeps_completed() {
 fn test_invalidation_reopens_completed_version() {
     // A version already finalized as Completed would otherwise take the Skip path forever,
     // so re-queuing a file has to reopen the summary too.
-    let file = "discogs_20260101_artists.xml.gz";
+    let file = "artist.jsonl.xz";
     let mut marker = marker_with_processed_file(file, "old-bytes", 500);
     marker.complete_processing();
     marker.complete_extraction();
@@ -588,7 +581,7 @@ fn test_invalidation_reopens_completed_version() {
 
 #[test]
 fn test_checksum_fields_survive_serde_round_trip() {
-    let file = "discogs_20260101_artists.xml.gz";
+    let file = "artist.jsonl.xz";
     let marker = marker_with_processed_file(file, "checksum-abc", 500);
 
     let json = serde_json::to_string(&marker).unwrap();
@@ -609,7 +602,7 @@ fn test_legacy_marker_json_without_checksums_loads() {
             "status": "completed", "started_at": null, "completed_at": null,
             "files_downloaded": 1, "files_total": 1, "bytes_downloaded": 10,
             "downloads_by_file": {
-                "discogs_20260101_artists.xml.gz": {
+                "artist.jsonl.xz": {
                     "status": "completed", "bytes_downloaded": 10, "started_at": null, "completed_at": null
                 }
             },
@@ -619,7 +612,7 @@ fn test_legacy_marker_json_without_checksums_loads() {
             "status": "completed", "started_at": null, "completed_at": null,
             "files_processed": 1, "files_total": 1, "records_extracted": 5, "current_file": null,
             "progress_by_file": {
-                "discogs_20260101_artists.xml.gz": {
+                "artist.jsonl.xz": {
                     "status": "completed", "records_extracted": 5, "messages_published": 5,
                     "batches_sent": 1, "started_at": null, "completed_at": null
                 }
@@ -635,11 +628,11 @@ fn test_legacy_marker_json_without_checksums_loads() {
 
     let marker: StateMarker = serde_json::from_str(json).unwrap();
 
-    assert!(marker.download_phase.downloads_by_file["discogs_20260101_artists.xml.gz"].checksum.is_none());
-    assert!(marker.processing_phase.progress_by_file["discogs_20260101_artists.xml.gz"].source_checksum.is_none());
+    assert!(marker.download_phase.downloads_by_file["artist.jsonl.xz"].checksum.is_none());
+    assert!(marker.processing_phase.progress_by_file["artist.jsonl.xz"].source_checksum.is_none());
 }
 
-// ── durable save (discogsography-mm27) ──────────────────────────────
+// ── durable save ────────────────────────────────────────────────────
 
 /// tmp+rename gives readers atomicity but says nothing about durability: without an
 /// fsync of the temp file and of the parent directory, POSIX allows the rename's
@@ -650,12 +643,13 @@ fn test_legacy_marker_json_without_checksums_loads() {
 #[tokio::test]
 async fn test_save_leaves_a_complete_readable_marker_and_no_temp_file() {
     let temp = tempfile::TempDir::new().unwrap();
-    let path = StateMarker::file_path(temp.path(), "20260101");
+    let path = StateMarker::musicbrainz_file_path(temp.path(), "20260101");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
     let mut marker = StateMarker::new("20260101".to_string());
     marker.start_processing(1);
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20260101_artists.xml.gz", 1234);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 1234);
     marker.save(&path).await.unwrap();
 
     // Fully written (not zero-length) and parseable.
@@ -663,7 +657,7 @@ async fn test_save_leaves_a_complete_readable_marker_and_no_temp_file() {
     assert!(!contents.is_empty(), "a zero-length marker is exactly the crash artifact this guards against");
     let loaded = StateMarker::load(&path).await.unwrap().expect("marker must parse");
     assert_eq!(loaded.current_version, "20260101");
-    assert_eq!(loaded.processing_phase.progress_by_file["discogs_20260101_artists.xml.gz"].records_extracted, 1234);
+    assert_eq!(loaded.processing_phase.progress_by_file["artist.jsonl.xz"].records_extracted, 1234);
 
     // The temp file must not survive the rename.
     assert!(!path.with_extension("json.tmp").exists());
@@ -674,7 +668,8 @@ async fn test_save_leaves_a_complete_readable_marker_and_no_temp_file() {
 #[tokio::test]
 async fn test_repeated_saves_overwrite_the_marker_in_place() {
     let temp = tempfile::TempDir::new().unwrap();
-    let path = StateMarker::file_path(temp.path(), "20260101");
+    let path = StateMarker::musicbrainz_file_path(temp.path(), "20260101");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
     let mut marker = StateMarker::new("20260101".to_string());
     marker.save(&path).await.unwrap();

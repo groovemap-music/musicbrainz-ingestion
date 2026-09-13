@@ -42,7 +42,7 @@ async fn test_setup_shutdown_handler() {
 }
 
 #[test]
-fn test_ascii_art_display_discogs() {
+fn test_ascii_art_omits_retired_repository_identity() {
     print_ascii_art();
 }
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -145,6 +146,39 @@ for documented_interface, implementation, implementation_marker in (
 contract = json.loads((ROOT / "contracts/catalog-events/v1/contract.json").read_text(encoding="utf-8"))
 require(contract["version"] == 1, "unexpected catalog contract version")
 require((ROOT / "contracts/catalog-events/v1/bindings/python/catalog_contract.py").is_file(), "generated Python binding is absent")
+
+# The source split left a few Discogs constructors, selectors, and comments in this
+# provider-owned repository. Keep the boundary executable: the retained cross-provider
+# vocabulary below is wire/state compatibility, not permission to restore a second runtime.
+boundary_sources = {
+    "src/types.rs": ("pub enum Source", "pub fn discogs() -> Vec<DataType>"),
+    "src/polite_http.rs": ("pub fn discogs() -> Self", "data.discogs.com"),
+    "src/state_marker.rs": ("pub fn file_path(discogs_root", "Try Discogs format first"),
+    "src/message_queue.rs": ("groovemap-discogs-artists",),
+    "src/musicbrainz/mod.rs": ("run_discogs_loop",),
+    "src/runtime.rs": ("process_discogs_data", "wait_for_discogs_idle", "both the Discogs and MusicBrainz loops", "5-day wait"),
+    "src/main.rs": ("Retry-After cooldowns up to 2h",),
+}
+for relative_path, forbidden_markers in boundary_sources.items():
+    source = (ROOT / relative_path).read_text(encoding="utf-8")
+    for marker in forbidden_markers:
+        require(marker not in source, f"dormant cross-source runtime surface remains in {relative_path}: {marker}")
+
+types_source = (ROOT / "src" / "types.rs").read_text(encoding="utf-8")
+health_source = (ROOT / "src" / "health.rs").read_text(encoding="utf-8")
+state_marker_source = (ROOT / "src" / "state_marker.rs").read_text(encoding="utf-8")
+require("DataType::Masters" in types_source, "retained masters compatibility variant is missing")
+require("pub masters: u64" in types_source, "retained masters progress field is missing")
+require('"masters"' in health_source, "health compatibility must retain the masters field")
+require('"extraction_progress_masters"' in health_source, "metrics compatibility must retain the masters field")
+require("musicbrainz_file_path" in state_marker_source, "MusicBrainz state-marker path helper is missing")
+
+contract_path = ROOT / "contracts" / "catalog-events" / "v1" / "contract.json"
+contract_digest = hashlib.sha256(contract_path.read_bytes()).hexdigest()
+require(
+    contract_digest == "85ebbe7b94669f2abd38ca9c5c83b4019aa71b8aa3aa4b9d9fb7f78ba35095ef",
+    "versioned MusicBrainz event contract bytes changed",
+)
 
 for forbidden in (ROOT / "target", ROOT / "dist", ROOT / ".env"):
     require(not forbidden.is_file(), f"generated or local file is tracked at {forbidden.name}")
