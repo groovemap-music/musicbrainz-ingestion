@@ -9,12 +9,12 @@ async fn test_state_marker_file_tracking() {
     let mut marker = StateMarker::new("20230101".to_string());
 
     // Test file start tracking
-    marker.start_file_processing("discogs_20230101_artists.xml.gz");
-    assert_eq!(marker.processing_phase.current_file, Some("discogs_20230101_artists.xml.gz".to_string()));
+    marker.start_file_processing("artist.jsonl.xz");
+    assert_eq!(marker.processing_phase.current_file, Some("artist.jsonl.xz".to_string()));
 
     // Test file completion
-    marker.complete_file_processing("discogs_20230101_artists.xml.gz", 1000);
-    let file_progress = marker.processing_phase.progress_by_file.get("discogs_20230101_artists.xml.gz");
+    marker.complete_file_processing("artist.jsonl.xz", 1000);
+    let file_progress = marker.processing_phase.progress_by_file.get("artist.jsonl.xz");
     assert!(file_progress.is_some());
     let progress = file_progress.unwrap();
     assert_eq!(progress.status, PhaseStatus::Completed);
@@ -26,14 +26,14 @@ async fn test_state_marker_periodic_updates() {
     use crate::state_marker::StateMarker;
 
     let mut marker = StateMarker::new("20230101".to_string());
-    marker.start_file_processing("discogs_20230101_artists.xml.gz");
+    marker.start_file_processing("artist.jsonl.xz");
 
     // Simulate periodic record updates (records, messages, batches)
     for i in 1..=3 {
-        marker.update_file_progress("discogs_20230101_artists.xml.gz", i * 1000, i * 1000, i * 10);
+        marker.update_file_progress("artist.jsonl.xz", i * 1000, i * 1000, i * 10);
     }
 
-    let file_progress = marker.processing_phase.progress_by_file.get("discogs_20230101_artists.xml.gz");
+    let file_progress = marker.processing_phase.progress_by_file.get("artist.jsonl.xz");
     assert!(file_progress.is_some());
     assert_eq!(file_progress.unwrap().records_extracted, 3000);
 }
@@ -48,8 +48,8 @@ async fn test_state_marker_save_load() {
 
     // Create and save marker
     let mut marker = StateMarker::new("20230101".to_string());
-    marker.start_file_processing("discogs_20230101_artists.xml.gz");
-    marker.complete_file_processing("discogs_20230101_artists.xml.gz", 1500);
+    marker.start_file_processing("artist.jsonl.xz");
+    marker.complete_file_processing("artist.jsonl.xz", 1500);
     marker.save(&marker_path).await.expect("Failed to save marker");
 
     // Load marker
@@ -57,7 +57,7 @@ async fn test_state_marker_save_load() {
     assert!(loaded.is_some());
     let loaded = loaded.unwrap();
     assert_eq!(loaded.current_version, "20230101");
-    let file_progress = loaded.processing_phase.progress_by_file.get("discogs_20230101_artists.xml.gz");
+    let file_progress = loaded.processing_phase.progress_by_file.get("artist.jsonl.xz");
     assert!(file_progress.is_some());
     assert_eq!(file_progress.unwrap().records_extracted, 1500);
 }
@@ -316,8 +316,8 @@ async fn test_progress_reporter_logs_on_timer_fire() {
         let mut s = state.write().await;
         s.extraction_progress.increment(DataType::Artists);
         s.extraction_progress.increment(DataType::Labels);
-        s.completed_files.insert("discogs_20260101_artists.xml.gz".to_string());
-        s.active_connections.insert(DataType::Labels, "discogs_20260101_labels.xml.gz".to_string());
+        s.completed_files.insert("artist.jsonl.xz".to_string());
+        s.active_connections.insert(DataType::Labels, "label.jsonl.xz".to_string());
     }
 
     let shutdown = Arc::new(tokio::sync::Notify::new());
@@ -480,8 +480,8 @@ async fn test_progress_reporter_with_completed_files_and_active_connections() {
         s.extraction_progress.labels = 500;
         s.extraction_progress.masters = 200;
         s.extraction_progress.releases = 300;
-        s.completed_files.insert("discogs_20260101_artists.xml.gz".to_string());
-        s.active_connections.insert(DataType::Labels, "discogs_20260101_labels.xml.gz".to_string());
+        s.completed_files.insert("artist.jsonl.xz".to_string());
+        s.active_connections.insert(DataType::Labels, "label.jsonl.xz".to_string());
     }
 
     let shutdown = Arc::new(tokio::sync::Notify::new());
@@ -600,13 +600,13 @@ async fn test_message_batcher_empty_input() {
 
 /// Regression for cu2.41: after a periodic/triggered extraction returns `Err`, the loop must
 /// reset a stuck `Running` status to `Failed`. Without this the status set up-front in
-/// `process_discogs_data` survives an early-`?` error for the whole multi-day periodic sleep,
+/// `process_musicbrainz_data` survives an early-`?` error for the whole multi-day periodic sleep,
 /// wedging `/trigger` recovery and misreporting `/health`.
 #[tokio::test]
 async fn test_reset_status_after_failed_check_clears_running() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
 
-    // Simulate the stuck state: process_discogs_data set Running, then an early `?` propagated.
+    // Simulate the stuck state: process_musicbrainz_data set Running, then an early `?` propagated.
     state.write().await.extraction_status = ExtractionStatus::Running;
 
     reset_status_after_failed_check(&state).await;
@@ -670,18 +670,10 @@ fn test_initial_run_outcome_shutdown_is_not_failure() {
     assert!(initial_run_outcome(true, false, "MusicBrainz").is_ok());
 }
 
-/// The same helper governs the Discogs initial run (fix-one-fix-all with cu2.44): a shutdown there
-/// must likewise short-circuit to Ok so it never trips the failure cooldown.
-#[test]
-fn test_initial_run_outcome_discogs_shutdown_is_ok() {
-    assert!(initial_run_outcome(false, true, "Discogs").is_ok());
-    assert!(initial_run_outcome(false, false, "Discogs").is_err());
-}
-
 // ── shutdown-flag monitor tests (cu2.44) ────────────────────────────
 
-/// Regression for cu2.44: the Discogs path lost SIGTERM/SIGINT delivered mid-run because nothing
-/// converted the one-shot `Notify` into a pollable flag. `spawn_shutdown_flag_monitor` must flip
+/// A long MusicBrainz run must not lose SIGTERM/SIGINT delivered between files.
+/// `spawn_shutdown_flag_monitor` converts the one-shot `Notify` into a pollable flag and must flip
 /// its `AtomicBool` when the `Notify` fires, so processing code can observe a shutdown between
 /// files without consuming the signal the outer `select!` needs.
 #[tokio::test]
@@ -800,7 +792,7 @@ fn test_extractor_state_default_extraction_status() {
 async fn test_extraction_status_set_to_running() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
 
-    // Simulate what process_discogs_data does at startup
+    // Simulate what process_musicbrainz_data does at startup
     {
         let mut s = state.write().await;
         s.extraction_progress = ExtractionProgress::default();
@@ -819,7 +811,7 @@ async fn test_extraction_status_set_to_running() {
 async fn test_extraction_status_set_completed_on_success() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
 
-    // Simulate what process_discogs_data does on success
+    // Simulate what process_musicbrainz_data does on success
     {
         let mut s = state.write().await;
         s.extraction_status = ExtractionStatus::Running;
@@ -838,7 +830,7 @@ async fn test_extraction_status_set_completed_on_success() {
 async fn test_extraction_status_set_failed_on_error() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
 
-    // Simulate what process_discogs_data does on failure
+    // Simulate what process_musicbrainz_data does on failure
     {
         let mut s = state.write().await;
         s.extraction_status = ExtractionStatus::Running;

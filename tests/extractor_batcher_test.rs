@@ -124,7 +124,7 @@ async fn test_message_batcher_saves_final_state_marker() {
 
     let state = Arc::new(RwLock::new(ExtractorState::default()));
     let mut marker = StateMarker::new("20260101".to_string());
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
+    marker.start_file_processing("artist.jsonl.xz");
     let state_marker = Arc::new(tokio::sync::Mutex::new(marker));
 
     let config = BatcherConfig {
@@ -133,7 +133,7 @@ async fn test_message_batcher_saves_final_state_marker() {
         state: state.clone(),
         state_marker: state_marker.clone(),
         marker_path: marker_path.clone(),
-        file_name: "discogs_20260101_artists.xml.gz".to_string(),
+        file_name: "artist.jsonl.xz".to_string(),
         state_save_interval: 10000, // High interval so periodic save won't trigger
     };
 
@@ -161,7 +161,7 @@ async fn test_message_batcher_saves_final_state_marker() {
     assert!(loaded.is_some(), "Should be able to load the saved state marker");
     let loaded = loaded.unwrap();
 
-    let file_progress = loaded.processing_phase.progress_by_file.get("discogs_20260101_artists.xml.gz");
+    let file_progress = loaded.processing_phase.progress_by_file.get("artist.jsonl.xz");
     assert!(file_progress.is_some(), "State marker should have progress for the file");
     let progress = file_progress.unwrap();
     assert_eq!(progress.records_extracted, 5, "Should track all 5 records");
@@ -180,7 +180,7 @@ async fn test_message_batcher_final_batch_increments_total_batches() {
 
     let state = Arc::new(RwLock::new(ExtractorState::default()));
     let mut marker = StateMarker::new("20260101".to_string());
-    marker.start_file_processing("discogs_20260101_artists.xml.gz");
+    marker.start_file_processing("artist.jsonl.xz");
     let state_marker = Arc::new(tokio::sync::Mutex::new(marker));
 
     let config = BatcherConfig {
@@ -189,7 +189,7 @@ async fn test_message_batcher_final_batch_increments_total_batches() {
         state: state.clone(),
         state_marker: state_marker.clone(),
         marker_path: marker_path.clone(),
-        file_name: "discogs_20260101_artists.xml.gz".to_string(),
+        file_name: "artist.jsonl.xz".to_string(),
         state_save_interval: 10000,
     };
 
@@ -214,7 +214,7 @@ async fn test_message_batcher_final_batch_increments_total_batches() {
 
     // Verify the state marker records the correct batch count
     let loaded = StateMarker::load(&marker_path).await.unwrap().unwrap();
-    let progress = loaded.processing_phase.progress_by_file.get("discogs_20260101_artists.xml.gz").unwrap();
+    let progress = loaded.processing_phase.progress_by_file.get("artist.jsonl.xz").unwrap();
     assert_eq!(progress.batches_sent, 1, "State marker should reflect 1 batch from final flush");
 }
 

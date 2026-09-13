@@ -111,12 +111,12 @@ fn test_file_complete_message_fields() {
         data_type: "labels".to_string(),
         timestamp: chrono::Utc::now(),
         total_processed: 12345,
-        file: "discogs_20241201_labels.xml.gz".to_string(),
+        file: "label.jsonl.xz".to_string(),
     };
 
     assert_eq!(msg.data_type, "labels");
     assert_eq!(msg.total_processed, 12345);
-    assert!(msg.file.contains("labels"));
+    assert_eq!(msg.file, "label.jsonl.xz");
 }
 
 #[test]

@@ -5,9 +5,9 @@ use std::str::FromStr;
 
 #[test]
 fn test_data_type_all_variants() {
-    let types = [DataType::Artists, DataType::Labels, DataType::Masters, DataType::Releases];
+    let types = [DataType::Artists, DataType::Labels, DataType::Masters, DataType::ReleaseGroups, DataType::Releases];
 
-    assert_eq!(types.len(), 4);
+    assert_eq!(types.len(), 5);
 
     for data_type in types {
         // Verify each variant has a valid string representation
@@ -22,6 +22,7 @@ fn test_data_type_all_conversions() {
         ("artists", DataType::Artists),
         ("labels", DataType::Labels),
         ("masters", DataType::Masters),
+        ("release-groups", DataType::ReleaseGroups),
         ("releases", DataType::Releases),
     ];
 
@@ -111,33 +112,6 @@ fn test_extraction_progress_large_numbers() {
     let progress = ExtractionProgress { artists: 1_000_000, labels: 500_000, masters: 750_000, release_groups: 0, releases: 2_000_000 };
 
     assert_eq!(progress.total(), 4_250_000);
-}
-
-#[test]
-fn test_source_display_and_from_str() {
-    use extractor::types::Source;
-    use std::str::FromStr;
-
-    // Display
-    assert_eq!(format!("{}", Source::Discogs), "discogs");
-    assert_eq!(format!("{}", Source::MusicBrainz), "musicbrainz");
-
-    // FromStr
-    assert_eq!(Source::from_str("discogs").unwrap(), Source::Discogs);
-    assert_eq!(Source::from_str("musicbrainz").unwrap(), Source::MusicBrainz);
-    assert_eq!(Source::from_str("DISCOGS").unwrap(), Source::Discogs);
-    assert!(Source::from_str("invalid").is_err());
-}
-
-#[test]
-fn test_source_serde_roundtrip() {
-    use extractor::types::Source;
-
-    for source in [Source::Discogs, Source::MusicBrainz] {
-        let json = serde_json::to_string(&source).unwrap();
-        let roundtripped: Source = serde_json::from_str(&json).unwrap();
-        assert_eq!(roundtripped, source);
-    }
 }
 
 #[test]

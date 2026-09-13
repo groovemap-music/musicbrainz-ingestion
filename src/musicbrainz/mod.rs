@@ -57,8 +57,8 @@ pub async fn run_musicbrainz_loop(
             break;
         }
 
-        // Transition Completed → Waiting before sleeping — see the equivalent block
-        // in run_discogs_loop for rationale.
+        // Transition Completed → Waiting before sleeping so observers can distinguish
+        // a successful idle period from an active extraction.
         {
             let mut s = state.write().await;
             if s.extraction_status == ExtractionStatus::Completed {
