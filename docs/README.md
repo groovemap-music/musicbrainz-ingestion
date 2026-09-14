@@ -2,6 +2,8 @@
 
 - [Extraction architecture](extraction.md) — download, archive, JSONL, enrichment,
   publication, and independent scheduling behavior.
+- [Downloader reliability contract](downloader-reliability-contract.md) — timeout, retry,
+  cleanup, restart, integrity, and error guarantees compared with Discogs ingestion.
 - [State-marker system](state-marker-system.md) — restart, durability, and checksum provenance.
 - [Periodic state-marker checkpoints](state-marker-periodic-updates.md) — recovery guarantees.
 - [Runtime identity](runtime-identity.md) — repository, image, service, and RabbitMQ names.
