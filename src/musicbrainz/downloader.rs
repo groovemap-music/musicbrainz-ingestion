@@ -685,3 +685,7 @@ fn extract_entity_from_reader<R: Read>(reader: R, entity: &str, out_path: &Path)
 #[cfg(test)]
 #[path = "tests/musicbrainz_downloader_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/downloader_reliability_contract_tests.rs"]
+mod reliability_contract_tests;
