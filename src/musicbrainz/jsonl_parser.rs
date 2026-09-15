@@ -142,6 +142,53 @@ fn extract_media_raw(media: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// Extract the raw MusicBrainz `release-events` array into a bounded list.
+///
+/// Each entry (`{"date": ..., "area": {"id": ..., "name": ...}}`) becomes
+/// `{date, area_name, area_mbid}`. An entry whose date and area are both absent —
+/// including one that isn't the expected object shape, since indexing a non-object
+/// `Value` yields `Null` — carries no information and is dropped rather than emitted
+/// as an all-null placeholder.
+fn extract_release_events(release_events: &[Value]) -> Vec<Value> {
+    release_events
+        .iter()
+        .filter_map(|event| {
+            let date = event["date"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
+            let area_name = event["area"]["name"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
+            let area_mbid = event["area"]["id"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
+            if date.is_null() && area_name.is_null() && area_mbid.is_null() {
+                return None;
+            }
+            Some(serde_json::json!({
+                "date": date,
+                "area_name": area_name,
+                "area_mbid": area_mbid
+            }))
+        })
+        .collect()
+}
+
+/// Extract catalogue numbers from the raw MusicBrainz `label-info` array.
+///
+/// Each entry (`{"catalog-number": ..., "label": {"id": ..., "name": ...}}`) becomes
+/// `{catalog_number, label_mbid, label_name}`. An entry without a catalogue number
+/// carries no identifier worth publishing and is dropped.
+fn extract_catalog_numbers(label_info: &[Value]) -> Vec<Value> {
+    label_info
+        .iter()
+        .filter_map(|info| {
+            let catalog_number = info["catalog-number"].as_str()?.to_string();
+            let label_mbid = info["label"]["id"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
+            let label_name = info["label"]["name"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
+            Some(serde_json::json!({
+                "catalog_number": catalog_number,
+                "label_mbid": label_mbid,
+                "label_name": label_name
+            }))
+        })
+        .collect()
+}
+
 /// Filter URL-rel entries, returning non-Discogs ones as `{"service": ..., "url": ...}` objects.
 pub fn extract_external_links(url_rels: &[Value]) -> Vec<Value> {
     url_rels
@@ -283,12 +330,17 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
     let release_group_mbid = v["release-group"]["id"].as_str().map(|s| Value::String(s.to_string())).unwrap_or(Value::Null);
 
     let media_raw = extract_media_raw(v["media"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
+    let release_events = extract_release_events(v["release-events"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
+    let catalog_numbers = extract_catalog_numbers(v["label-info"].as_array().map(|a| a.as_slice()).unwrap_or(&[]));
 
     let mut data = serde_json::json!({
         "discogs_release_id": discogs_release_id,
         "name": v["title"],
         "disambiguation": v["disambiguation"],
         "barcode": v["barcode"],
+        "country": v["country"],
+        "release_events": release_events,
+        "catalog_numbers": catalog_numbers,
         "status": v["status"],
         "release_group_mbid": release_group_mbid,
         "aliases": v["aliases"],

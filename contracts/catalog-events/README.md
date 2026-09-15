@@ -35,6 +35,22 @@ so the two cannot drift apart. See `docs/extraction.md` for the producer-side ma
 
 [adr-0007]: https://github.com/groovemap-music/design/blob/main/docs/adr/0007-canonical-media-taxonomy.md
 
+## Release identifier fields
+
+`releases` events also carry three catalog-identifier fields, additive within contract
+v1 (catalog-identifiers program, wave 1, ADR 0011):
+
+- `country`: the release's ISO country code from the dump, or `null` when absent.
+- `release_events`: `[{date, area_name, area_mbid}]` from the dump's raw
+  `release-events`; an entry with neither a date nor an area is dropped.
+- `catalog_numbers`: `[{catalog_number, label_mbid, label_name}]` from the dump's raw
+  `label-info`; an entry without a catalogue number is dropped.
+
+These carry the whitelisted release-events and label-info fields verbatim; they do not
+surface manufacturing relations, which stay in the generic `relations` array. See
+`definitions/musicbrainz.json`'s `fixture_payloads.releases` for a worked example and
+`docs/extraction.md` for the producer-side mapping.
+
 ## Vendored media taxonomy
 
 `vocab/media-taxonomy.json` is **not generated**. It is the provider-neutral media
