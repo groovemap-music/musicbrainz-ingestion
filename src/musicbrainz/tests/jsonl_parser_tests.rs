@@ -400,6 +400,101 @@ fn test_parse_mb_release_line_media_raw_changes_sha256() {
     assert_eq!(msg_with_media.sha256, calculate_content_hash(&msg_with_media.data));
 }
 
+// ─── parse_mb_release_line: country, release_events, catalog_numbers ────────
+
+#[test]
+fn test_parse_mb_release_line_country_release_events_catalog_numbers() {
+    let line = r#"{"id":"release-full","title":"Full Release","barcode":null,"country":"GB","status":"Official","release-group":{"id":"rg-7"},"relations":[],"release-events":[{"date":"1969-09-26","area":{"id":"area-1","name":"United Kingdom"}},{"date":"1969-10-01","area":{"id":"area-2","name":"United States"}}],"label-info":[{"catalog-number":"PCS 7088","label":{"id":"label-1","name":"Parlophone"}},{"catalog-number":"SO-383","label":{"id":"label-2","name":"Apple"}}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+
+    assert_eq!(msg.data["country"], "GB");
+
+    let events = msg.data["release_events"].as_array().unwrap();
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0]["date"], "1969-09-26");
+    assert_eq!(events[0]["area_name"], "United Kingdom");
+    assert_eq!(events[0]["area_mbid"], "area-1");
+    assert_eq!(events[1]["date"], "1969-10-01");
+    assert_eq!(events[1]["area_name"], "United States");
+    assert_eq!(events[1]["area_mbid"], "area-2");
+
+    let catalog_numbers = msg.data["catalog_numbers"].as_array().unwrap();
+    assert_eq!(catalog_numbers.len(), 2);
+    assert_eq!(catalog_numbers[0]["catalog_number"], "PCS 7088");
+    assert_eq!(catalog_numbers[0]["label_mbid"], "label-1");
+    assert_eq!(catalog_numbers[0]["label_name"], "Parlophone");
+    assert_eq!(catalog_numbers[1]["catalog_number"], "SO-383");
+    assert_eq!(catalog_numbers[1]["label_mbid"], "label-2");
+    assert_eq!(catalog_numbers[1]["label_name"], "Apple");
+}
+
+#[test]
+fn test_parse_mb_release_line_no_country_events_or_catalog_numbers() {
+    let line = r#"{"id":"release-empty","title":"No Extras","barcode":null,"status":"Official","release-group":{"id":"rg-8"},"relations":[]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+
+    assert!(msg.data["country"].is_null());
+    assert!(msg.data["release_events"].as_array().unwrap().is_empty());
+    assert!(msg.data["catalog_numbers"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn test_parse_mb_release_line_drops_malformed_release_events_and_catalog_numbers() {
+    // A release-event with neither `date` nor `area` carries nothing and is dropped;
+    // a label-info entry without a `catalog-number` carries no identifier and is dropped.
+    let line = r#"{"id":"release-malformed","title":"Malformed Release","barcode":null,"status":"Official","release-group":{"id":"rg-9"},"relations":[],"release-events":[{},{"date":"1970-01-01","area":{"id":"area-3","name":"France"}}],"label-info":[{"label":{"id":"label-3","name":"No Catalog Label"}},{"catalog-number":"CAT-1","label":{"id":"label-4","name":"Good Label"}}]}"#;
+    let msg = parse_mb_release_line(line).unwrap();
+
+    let events = msg.data["release_events"].as_array().unwrap();
+    assert_eq!(events.len(), 1, "the all-null release-event entry must be dropped");
+    assert_eq!(events[0]["date"], "1970-01-01");
+    assert_eq!(events[0]["area_name"], "France");
+
+    let catalog_numbers = msg.data["catalog_numbers"].as_array().unwrap();
+    assert_eq!(catalog_numbers.len(), 1, "the label-info entry without a catalog-number must be dropped");
+    assert_eq!(catalog_numbers[0]["catalog_number"], "CAT-1");
+    assert_eq!(catalog_numbers[0]["label_name"], "Good Label");
+}
+
+#[test]
+fn test_parse_mb_release_line_country_changes_sha256() {
+    let base = r#"{"id":"release-country-hash","title":"Country Hash Release","barcode":null,"status":"Official","release-group":{"id":"rg-10"},"relations":[]"#;
+    let line_no_country = format!("{base}}}");
+    let line_with_country = format!(r#"{base},"country":"US"}}"#);
+
+    let msg_no_country = parse_mb_release_line(&line_no_country).unwrap();
+    let msg_with_country = parse_mb_release_line(&line_with_country).unwrap();
+
+    assert_ne!(msg_no_country.sha256, msg_with_country.sha256, "sha256 must change when country differs");
+    assert_eq!(msg_with_country.sha256, calculate_content_hash(&msg_with_country.data));
+}
+
+#[test]
+fn test_parse_mb_release_line_release_events_change_sha256() {
+    let base = r#"{"id":"release-events-hash","title":"Events Hash Release","barcode":null,"status":"Official","release-group":{"id":"rg-11"},"relations":[]"#;
+    let line_no_events = format!("{base}}}");
+    let line_with_events = format!(r#"{base},"release-events":[{{"date":"1971-01-01","area":{{"id":"area-4","name":"Germany"}}}}]}}"#);
+
+    let msg_no_events = parse_mb_release_line(&line_no_events).unwrap();
+    let msg_with_events = parse_mb_release_line(&line_with_events).unwrap();
+
+    assert_ne!(msg_no_events.sha256, msg_with_events.sha256, "sha256 must change when release_events differ");
+    assert_eq!(msg_with_events.sha256, calculate_content_hash(&msg_with_events.data));
+}
+
+#[test]
+fn test_parse_mb_release_line_catalog_numbers_change_sha256() {
+    let base = r#"{"id":"release-catalog-hash","title":"Catalog Hash Release","barcode":null,"status":"Official","release-group":{"id":"rg-12"},"relations":[]"#;
+    let line_no_catalog = format!("{base}}}");
+    let line_with_catalog = format!(r#"{base},"label-info":[{{"catalog-number":"CAT-2","label":{{"id":"label-5","name":"Hash Label"}}}}]}}"#);
+
+    let msg_no_catalog = parse_mb_release_line(&line_no_catalog).unwrap();
+    let msg_with_catalog = parse_mb_release_line(&line_with_catalog).unwrap();
+
+    assert_ne!(msg_no_catalog.sha256, msg_with_catalog.sha256, "sha256 must change when catalog_numbers differ");
+    assert_eq!(msg_with_catalog.sha256, calculate_content_hash(&msg_with_catalog.data));
+}
+
 #[test]
 fn test_parse_mb_release_line_true_invalid_json() {
     let result = parse_mb_release_line("definitely not json");
