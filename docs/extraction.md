@@ -46,9 +46,20 @@ still published.
 Each parser computes `sha256` from its final `data` payload immediately before creating
 the event. Release events additionally include:
 
+- `country`, the release's ISO country code, or `null` when the dump carries none;
+- `release_events`, an array of `{date, area_name, area_mbid}` built from the dump's raw
+  `release-events`; an entry with neither a date nor an area carries nothing and is
+  dropped;
+- `catalog_numbers`, an array of `{catalog_number, label_mbid, label_name}` built from
+  the dump's raw `label-info`; an entry without a catalogue number is dropped;
 - `media_raw`, a source-order copy of MusicBrainz medium metadata without track arrays;
 - `media`, the canonical block mapped with the vendored
   [`media-taxonomy.json`](../contracts/catalog-events/vocab/media-taxonomy.json).
+
+A release without a country, release events, or catalogue numbers still emits `country`
+as `null` and `release_events`/`catalog_numbers` as empty arrays — never a missing key —
+and all three are computed before the content hash, so a change to any of them changes
+`sha256`.
 
 Unknown vocabulary values remain under `media.unmapped`. The mapping implementation is
 `src/musicbrainz/media.rs`, and its conformance fixtures are under
