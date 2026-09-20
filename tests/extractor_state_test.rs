@@ -198,7 +198,6 @@ async fn test_extractor_state_memory_cleanup() {
         }
     }
 
-    // Clear completed files
     {
         let mut s = state.write().await;
         s.completed_files.clear();

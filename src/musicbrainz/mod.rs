@@ -455,7 +455,6 @@ pub async fn process_musicbrainz_data(
         }
     }
 
-    // Update extraction status
     {
         let mut s = state.write().await;
         s.extraction_status = if success { ExtractionStatus::Completed } else { ExtractionStatus::Failed };

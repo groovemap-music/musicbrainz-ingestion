@@ -86,7 +86,6 @@ async fn test_message_batcher_basic() {
     let marker_path = temp_dir.path().join(".extraction_status_20230101.json");
     let state_marker = Arc::new(tokio::sync::Mutex::new(StateMarker::new("20230101".to_string())));
 
-    // Send some test messages
     for i in 0..5 {
         let message =
             DataMessage { sha256: format!("sha{}", i), data: serde_json::json!({ "test": format!("test{}", i) }), id: i.to_string(), raw_xml: None };
@@ -94,7 +93,6 @@ async fn test_message_batcher_basic() {
     }
     drop(parse_sender);
 
-    // Run batcher
     let batcher_config = BatcherConfig {
         batch_size: 3,
         data_type: DataType::Artists,
@@ -106,10 +104,8 @@ async fn test_message_batcher_basic() {
     };
     let batcher = message_batcher(parse_receiver, batch_sender, batcher_config);
 
-    // Spawn batcher task
     tokio::spawn(batcher);
 
-    // Collect batches
     let mut total_messages = 0;
     while let Some(batch) = batch_receiver.recv().await {
         total_messages += batch.len();
@@ -144,7 +140,6 @@ async fn test_message_batcher_respects_batch_size() {
     }
     drop(parse_sender);
 
-    // Run batcher
     let batcher_config = BatcherConfig {
         batch_size,
         data_type: DataType::Labels,
