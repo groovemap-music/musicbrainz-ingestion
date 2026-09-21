@@ -27,16 +27,12 @@ async fn test_message_batcher_empty_batch() {
         state_save_interval: 100,
     };
 
-    // Close sender immediately
     drop(tx);
 
-    // Start batcher
     let batcher_handle = tokio::spawn(async move { message_batcher(rx, batch_tx, config).await });
 
-    // Should receive no batches
     assert!(batch_rx.recv().await.is_none());
 
-    // Batcher should finish without error
     assert!(batcher_handle.await.is_ok());
 }
 
@@ -63,7 +59,6 @@ async fn test_message_batcher_single_message() {
     tx.send(message).await.unwrap();
     drop(tx);
 
-    // Start batcher
     tokio::spawn(async move {
         message_batcher(rx, batch_tx, config).await.ok();
     });
@@ -100,7 +95,6 @@ async fn test_message_batcher_multiple_batches() {
     }
     drop(tx);
 
-    // Start batcher
     tokio::spawn(async move {
         message_batcher(rx, batch_tx, config).await.ok();
     });

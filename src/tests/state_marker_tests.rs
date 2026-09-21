@@ -15,20 +15,17 @@ fn test_new_state_marker() {
 fn test_download_phase_lifecycle() {
     let mut marker = StateMarker::new("20260101".to_string());
 
-    // Start download
     marker.start_download(4);
     assert_eq!(marker.download_phase.status, PhaseStatus::InProgress);
     assert_eq!(marker.download_phase.files_total, 4);
     assert!(marker.download_phase.started_at.is_some());
 
-    // Download files
     marker.file_downloaded("artist.jsonl.xz", 1000);
     marker.file_downloaded("label.jsonl.xz", 2000);
     assert_eq!(marker.download_phase.files_downloaded, 2);
     assert_eq!(marker.download_phase.bytes_downloaded, 3000);
     assert_eq!(marker.download_phase.downloads_by_file.len(), 2);
 
-    // Complete download
     marker.complete_download();
     assert_eq!(marker.download_phase.status, PhaseStatus::Completed);
     assert!(marker.download_phase.completed_at.is_some());
@@ -201,7 +198,6 @@ async fn test_load_and_save_roundtrip() {
     marker.file_downloaded("artist.jsonl.xz", 1000);
     marker.save(path).await.unwrap();
 
-    // Load it back
     let loaded = StateMarker::load(path).await.unwrap();
     assert!(loaded.is_some());
     let loaded = loaded.unwrap();
