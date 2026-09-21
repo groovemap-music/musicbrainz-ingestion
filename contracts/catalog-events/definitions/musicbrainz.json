@@ -19,6 +19,20 @@
     },
     "releases": {
       "name": "Contract Release",
+      "barcode": "07599251581",
+      "identifiers": {
+        "identifiers_version": "1",
+        "items": [
+          {"type": "barcode", "value": "07599251581", "description": null, "source": {"provider": "musicbrainz", "type": null, "field": "barcode"}},
+          {"type": "catalog_number", "value": "PCS 7088", "description": null, "source": {"provider": "musicbrainz", "type": null, "field": "label-info[].catalog-number"}}
+        ],
+        "types": ["barcode", "catalog_number"],
+        "aliases": [
+          {"provider": "barcode", "external_id": "07599251581"},
+          {"provider": "catalog_number", "external_id": "PCS 7088"}
+        ],
+        "unmapped": {"types": []}
+      },
       "status": "Official",
       "country": "GB",
       "release_events": [

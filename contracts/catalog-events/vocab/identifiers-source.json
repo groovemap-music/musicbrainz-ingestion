@@ -1,0 +1,9 @@
+{
+  "source": "design",
+  "commit": "5bfdf1005c5d95c99143e8c2acd189e127e1cb10",
+  "files": {
+    "identifier-types.json": {"path": "taxonomy/identifiers/v1/identifier-types.json", "sha256": "87b844a20f35d45e7ba176df58d6ccf3d7bc88beecda90457b1a2afb3432fb34"},
+    "identifier-types.schema.json": {"path": "taxonomy/identifiers/v1/identifier-types.schema.json", "sha256": "8f15b6afe280b24d906dd0105839ccf2f278a144833bec1dcf99d002936b24e5"},
+    "identifier-block.schema.json": {"path": "taxonomy/identifiers/v1/identifier-block.schema.json", "sha256": "b1370114c3f25dff6e3a314817de0a6e6d15b580ac508d3857fc9596c67a91a2"}
+  }
+}

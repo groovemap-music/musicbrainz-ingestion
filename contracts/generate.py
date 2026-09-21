@@ -162,6 +162,17 @@ def vendored_vocab_errors() -> list[str]:
             f"vendored media taxonomy digest mismatch: {VENDORED_MEDIA_TAXONOMY_PATH.relative_to(ROOT)} "
             f"has sha256 {actual_digest}, but {VENDORED_VOCAB_SOURCE_PATH.relative_to(ROOT)} records {expected_digest}"
         )
+    identifier_source = VOCAB_ROOT / "identifiers-source.json"
+    try:
+        record = json.loads(identifier_source.read_text(encoding="utf-8"))
+        if record["commit"] != "5bfdf1005c5d95c99143e8c2acd189e127e1cb10":
+            errors.append("identifier vocabulary source commit differs from reviewed design commit")
+        for filename, source in record["files"].items():
+            actual = sha256((VOCAB_ROOT / filename).read_bytes()).hexdigest()
+            if actual != source["sha256"]:
+                errors.append(f"vendored identifier file digest mismatch: {filename}")
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        errors.append(f"invalid identifier vocabulary source record: {exc}")
     return errors
 
 

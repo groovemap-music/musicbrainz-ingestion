@@ -1,4 +1,5 @@
 {
+  "barcode": "07599251581",
   "catalog_numbers": [
     {
       "catalog_number": "PCS 7088",
@@ -8,6 +9,48 @@
   ],
   "country": "GB",
   "id": "contract-musicbrainz-releases",
+  "identifiers": {
+    "aliases": [
+      {
+        "external_id": "07599251581",
+        "provider": "barcode"
+      },
+      {
+        "external_id": "PCS 7088",
+        "provider": "catalog_number"
+      }
+    ],
+    "identifiers_version": "1",
+    "items": [
+      {
+        "description": null,
+        "source": {
+          "field": "barcode",
+          "provider": "musicbrainz",
+          "type": null
+        },
+        "type": "barcode",
+        "value": "07599251581"
+      },
+      {
+        "description": null,
+        "source": {
+          "field": "label-info[].catalog-number",
+          "provider": "musicbrainz",
+          "type": null
+        },
+        "type": "catalog_number",
+        "value": "PCS 7088"
+      }
+    ],
+    "types": [
+      "barcode",
+      "catalog_number"
+    ],
+    "unmapped": {
+      "types": []
+    }
+  },
   "media": {
     "container": null,
     "edition": [],

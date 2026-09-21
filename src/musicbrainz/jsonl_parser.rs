@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use xz2::read::XzDecoder;
 
+use crate::musicbrainz::identifiers;
 use crate::musicbrainz::media;
 use crate::types::{DataMessage, DataType, calculate_content_hash};
 
@@ -356,6 +357,7 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
     // provenance record. It is attached before the hash so the hash covers it and consumers
     // detect a vocabulary-driven change.
     media::attach_media_block(&mut data, &v);
+    identifiers::attach_identifiers_block(&mut data, &v);
 
     let sha256 = calculate_content_hash(&data);
 
