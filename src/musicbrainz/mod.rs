@@ -4,6 +4,7 @@
 //! repository. It has no cross-container ordering, health polling, or lock.
 
 pub mod downloader;
+pub mod identifiers;
 pub mod jsonl_parser;
 pub mod media;
 
