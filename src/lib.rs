@@ -6,6 +6,7 @@ pub mod generated {
 }
 pub mod extractor;
 pub mod health;
+pub mod logging;
 pub mod message_queue;
 pub mod musicbrainz;
 pub mod polite_http;
