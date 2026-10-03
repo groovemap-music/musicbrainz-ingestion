@@ -19,6 +19,16 @@ The service publishes artists, labels, release groups, and releases. It is an
 independent runtime: it does not poll Discogs health, acquire a cross-container lock,
 or wait for Discogs ingestion. The two provider containers may ingest concurrently.
 
+## Structured logging
+
+Every JSON log event includes a root `environment` string, read once from `ENVIRONMENT`
+at startup. Unset or non-Unicode values default to `development`; explicit values,
+including an empty string, are preserved. Production Compose must set
+`ENVIRONMENT=production`. This log context is independent of
+`OTEL_RESOURCE_ATTRIBUTES` and cannot be replaced by an event field named `environment`,
+which remains inside `fields`. `LOG_LEVEL` filtering and the existing JSON event/span
+fields remain unchanged.
+
 ## Telemetry
 
 The extractor pushes OpenTelemetry metrics **and traces** over **OTLP/HTTP-protobuf** to
