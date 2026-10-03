@@ -3,6 +3,31 @@
 All notable changes to this repository will be recorded here by Commitizen from
 Conventional Commits.
 
+## v0.3.0 (2026-10-03)
+
+### Feat
+
+- **catalog**: normalize MusicBrainz release identifiers before hashing
+- **contracts**: carry country, release events, and catalogue numbers in release fixtures and document them
+- **parser**: carry country, release events, and catalogue numbers in release events
+- **telemetry**: port the wave-2 runtime metrics and tracing module
+
+### Fix
+
+- **logging**: include deployment environment in JSON events
+- **deps**: update rustls to clear RUSTSEC-2026-0285
+- **deps**: refresh rust:1.98-slim digest and pin Python 3.14.7 (#3)
+- **ci**: accept commitizen's no-eligible-commits bump-preview state
+
+### Refactor
+
+- **runtime**: remove dormant Discogs seams
+- **runtime**: consolidate ingestion lifecycle seams
+
+### Perf
+
+- **build**: cache rustc output with sccache
+
 ## v0.2.1 (2026-09-04)
 
 ### Fix
