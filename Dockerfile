@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.98-slim@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7 AS builder
+FROM rust:1.99-slim@sha256:2752b332db73fdbb7dc576f06c82ed1f312005784ef913d7e04a28f5f55dc581 AS builder
 
 # Install build dependencies
 # hadolint ignore=DL3008
@@ -70,7 +70,7 @@ RUN --mount=type=cache,id=sccache-musicbrainz-ingestion,target=/root/.cache/scca
     sccache --show-stats
 
 # Runtime stage
-FROM debian:13-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+FROM debian:13-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 # Build arguments for configurable UID/GID (must match the compose `user:` override)
 ARG BUILD_DATE
