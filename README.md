@@ -131,8 +131,8 @@ check` has already passed locally.
 
 Builds run `rustc` through [sccache](https://github.com/mozilla/sccache).
 `just bootstrap` installs it with the other mise-managed tools, and
-`.cargo/config.toml` sets `rustc-wrapper = "sccache"`, so every local `cargo`
-invocation reuses previously compiled objects.
+`.mise.toml` sets `RUSTC_WRAPPER=sccache` in its `[env]` table (mise must be
+activated), so every local `cargo` invocation reuses previously compiled objects.
 
 Locally the cache lives in sccache's default directory, `~/.cache/sccache` on
 Linux and `~/Library/Caches/Mozilla.sccache` on macOS; set `SCCACHE_DIR` to move
