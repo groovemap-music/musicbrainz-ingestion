@@ -2,6 +2,9 @@
 
 use super::*;
 
+/// The dump version every parser test stamps on its messages.
+const TEST_DUMP_VERSION: &str = "20260101";
+
 /// Assert `hash` is a well-formed SHA-256 hex digest: 64 lowercase hex characters.
 fn assert_valid_sha256(hash: &str) {
     assert_eq!(hash.len(), 64, "sha256 must be 64 hex characters, got {} in {:?}", hash.len(), hash);
@@ -203,7 +206,7 @@ fn test_enrich_relations_matches_canonicalized_release_group_targets() {
 #[test]
 fn test_parse_mb_artist_line_with_discogs() {
     let line = r#"{"id":"b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d","name":"The Beatles","sort-name":"Beatles, The","type":"Group","gender":null,"life-span":{"begin":"1960","end":"1970","ended":true},"area":{"name":"London"},"begin-area":{"name":"Liverpool"},"end-area":null,"disambiguation":"the band","aliases":[],"tags":[],"relations":[{"type":"discogs","target-type":"url","url":{"resource":"https://www.discogs.com/artist/108713"}},{"type":"wikipedia","target-type":"url","url":{"resource":"https://en.wikipedia.org/wiki/The_Beatles"}}]}"#;
-    let msg = parse_mb_artist_line(line).unwrap();
+    let msg = parse_mb_artist_line(line, TEST_DUMP_VERSION).unwrap();
     assert_eq!(msg.id, "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d");
     assert_eq!(msg.data["discogs_artist_id"], 108713);
     assert_eq!(msg.data["mb_type"], "Group");
@@ -222,7 +225,7 @@ fn test_parse_mb_artist_line_with_discogs() {
 #[test]
 fn test_parse_mb_artist_line_no_discogs() {
     let line = r#"{"id":"some-mbid","name":"Unknown","sort-name":"Unknown","type":"Person","gender":"Male","life-span":{"begin":"1990","end":null,"ended":false},"area":null,"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
-    let msg = parse_mb_artist_line(line).unwrap();
+    let msg = parse_mb_artist_line(line, TEST_DUMP_VERSION).unwrap();
     assert!(msg.data["discogs_artist_id"].is_null());
     assert_eq!(msg.data["gender"], "Male");
     assert_eq!(msg.data["mb_type"], "Person");
@@ -230,14 +233,14 @@ fn test_parse_mb_artist_line_no_discogs() {
 
 #[test]
 fn test_parse_mb_artist_line_invalid_json() {
-    let result = parse_mb_artist_line("not valid json{{{");
+    let result = parse_mb_artist_line("not valid json{{{", TEST_DUMP_VERSION);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_parse_mb_artist_line_life_span_fields() {
     let line = r#"{"id":"test-id","name":"Solo Artist","sort-name":"Artist, Solo","type":"Person","gender":"Female","life-span":{"begin":"1985","end":null,"ended":false},"area":{"name":"New York"},"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
-    let msg = parse_mb_artist_line(line).unwrap();
+    let msg = parse_mb_artist_line(line, TEST_DUMP_VERSION).unwrap();
     assert_eq!(msg.data["life_span"]["begin"], "1985");
     assert!(msg.data["life_span"]["end"].is_null());
     assert_eq!(msg.data["life_span"]["ended"], false);
@@ -248,7 +251,7 @@ fn test_parse_mb_artist_line_life_span_fields() {
 #[test]
 fn test_parse_mb_label_line_with_discogs() {
     let line = r#"{"id":"4cccc72a-0bd0-433a-905e-dad87871397d","name":"EMI","type":"Original Production","label-code":542,"life-span":{"begin":"1931","end":"2012","ended":true},"area":{"name":"United Kingdom"},"disambiguation":"","relations":[{"type":"discogs","target-type":"url","url":{"resource":"https://www.discogs.com/label/542"}},{"type":"allmusic","target-type":"url","url":{"resource":"https://www.allmusic.com/artist/emi-mn0000929870"}}]}"#;
-    let msg = parse_mb_label_line(line).unwrap();
+    let msg = parse_mb_label_line(line, TEST_DUMP_VERSION).unwrap();
     assert_eq!(msg.id, "4cccc72a-0bd0-433a-905e-dad87871397d");
     assert_eq!(msg.data["discogs_label_id"], 542);
     assert_eq!(msg.data["name"], "EMI");
@@ -263,7 +266,7 @@ fn test_parse_mb_label_line_with_discogs() {
 #[test]
 fn test_parse_mb_label_line_no_discogs() {
     let line = r#"{"id":"label-mbid","name":"Indie Label","type":"Imprint","label-code":null,"life-span":{"begin":"2000","end":null,"ended":false},"area":null,"disambiguation":"small indie","relations":[]}"#;
-    let msg = parse_mb_label_line(line).unwrap();
+    let msg = parse_mb_label_line(line, TEST_DUMP_VERSION).unwrap();
     assert!(msg.data["discogs_label_id"].is_null());
     assert_eq!(msg.data["name"], "Indie Label");
     assert!(msg.data["area"].is_null());
@@ -271,7 +274,7 @@ fn test_parse_mb_label_line_no_discogs() {
 
 #[test]
 fn test_parse_mb_label_line_invalid_json() {
-    let result = parse_mb_label_line("{bad json");
+    let result = parse_mb_label_line("{bad json", TEST_DUMP_VERSION);
     assert!(result.is_err());
 }
 
@@ -280,7 +283,7 @@ fn test_parse_mb_label_line_invalid_json() {
 #[test]
 fn test_parse_mb_release_line_with_discogs() {
     let line = r#"{"id":"c7b9bcd3-a23e-476b-be7f-f8e96c54b6a2","title":"Abbey Road","barcode":"077774644228","status":"Official","release-group":{"id":"1dc4c347-a1db-32aa-b14f-bc9cc507b843"},"relations":[{"type":"discogs","target-type":"url","url":{"resource":"https://www.discogs.com/release/5027187"}},{"type":"youtube","target-type":"url","url":{"resource":"https://www.youtube.com/watch?v=abc"}}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     assert_eq!(msg.id, "c7b9bcd3-a23e-476b-be7f-f8e96c54b6a2");
     assert_eq!(msg.data["discogs_release_id"], 5_027_187);
     assert_eq!(msg.data["name"], "Abbey Road");
@@ -296,7 +299,7 @@ fn test_parse_mb_release_line_with_discogs() {
 fn test_parse_mb_release_line_no_discogs() {
     let line =
         r#"{"id":"release-mbid","title":"Unknown Release","barcode":null,"status":"Bootleg","release-group":{"id":"group-mbid"},"relations":[]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     assert!(msg.data["discogs_release_id"].is_null());
     assert_eq!(msg.data["name"], "Unknown Release");
     assert_eq!(msg.data["status"], "Bootleg");
@@ -304,7 +307,7 @@ fn test_parse_mb_release_line_no_discogs() {
 
 #[test]
 fn test_parse_mb_release_line_invalid_json() {
-    let result = parse_mb_release_line("[]");
+    let result = parse_mb_release_line("[]", TEST_DUMP_VERSION);
     // An array is valid JSON but will produce "unknown" id — it should succeed but produce null fields
     // Actually this won't error because serde_json::from_str succeeds on arrays.
     // The function returns Ok with "unknown" id.
@@ -316,7 +319,7 @@ fn test_parse_mb_release_line_invalid_json() {
 #[test]
 fn test_parse_mb_release_line_media_raw_single_cd() {
     let line = r#"{"id":"release-cd","title":"Single CD Release","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[],"media":[{"format":"CD","format-id":"9712d52a-4509-3d4b-a1a2-67c88c643e31","position":1,"title":null,"track-count":12,"tracks":[{"id":"t1","title":"Track One"}]}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert_eq!(media.len(), 1);
     assert_eq!(media[0]["format"], "CD");
@@ -333,7 +336,7 @@ fn test_parse_mb_release_line_media_raw_vinyl_two_mediums_position_order() {
     // A 2x12" vinyl release: two mediums, each with its own format/title/track-count,
     // preserved in position order.
     let line = r#"{"id":"release-vinyl","title":"Double Vinyl Release","barcode":null,"status":"Official","release-group":{"id":"rg-2"},"relations":[],"media":[{"format":"12\" Vinyl","format-id":"fmt-1","position":1,"title":"Side A/B","track-count":6,"tracks":[{"id":"t1"}]},{"format":"12\" Vinyl","format-id":"fmt-1","position":2,"title":"Side C/D","track-count":5,"tracks":[{"id":"t2"}]}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert_eq!(media.len(), 2);
     assert_eq!(media[0]["position"], 1);
@@ -347,7 +350,7 @@ fn test_parse_mb_release_line_media_raw_vinyl_two_mediums_position_order() {
 #[test]
 fn test_parse_mb_release_line_media_raw_digital_media() {
     let line = r#"{"id":"release-digital","title":"Digital Release","barcode":null,"status":"Official","release-group":{"id":"rg-3"},"relations":[],"media":[{"format":"Digital Media","format-id":"fmt-2","position":1,"title":null,"track-count":10,"tracks":[]}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert_eq!(media.len(), 1);
     assert_eq!(media[0]["format"], "Digital Media");
@@ -358,7 +361,7 @@ fn test_parse_mb_release_line_media_raw_digital_media() {
 fn test_parse_mb_release_line_media_raw_missing_format() {
     // A medium lacking a `format` key: emit null, not omit the key.
     let line = r#"{"id":"release-noformat","title":"No Format Release","barcode":null,"status":"Official","release-group":{"id":"rg-4"},"relations":[],"media":[{"position":1,"title":null,"track-count":3,"tracks":[]}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert_eq!(media.len(), 1);
     assert!(media[0]["format"].is_null());
@@ -371,7 +374,7 @@ fn test_parse_mb_release_line_media_raw_missing_format() {
 fn test_parse_mb_release_line_media_raw_no_media_field_emits_empty_list() {
     let line =
         r#"{"id":"release-mbid","title":"Unknown Release","barcode":null,"status":"Bootleg","release-group":{"id":"group-mbid"},"relations":[]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert!(media.is_empty());
 }
@@ -380,7 +383,7 @@ fn test_parse_mb_release_line_media_raw_no_media_field_emits_empty_list() {
 fn test_parse_mb_release_line_media_raw_strips_discs() {
     // `discs` (per-medium disc-id listings) must never be emitted either.
     let line = r#"{"id":"release-discs","title":"Release With Discs","barcode":null,"status":"Official","release-group":{"id":"rg-5"},"relations":[],"media":[{"format":"CD","format-id":"fmt-3","position":1,"title":null,"track-count":8,"tracks":[],"discs":[{"id":"disc-1","sectors":123456}]}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
     let media = msg.data["media_raw"].as_array().unwrap();
     assert_eq!(media.len(), 1);
     assert!(media[0].get("discs").is_none());
@@ -393,8 +396,8 @@ fn test_parse_mb_release_line_media_raw_changes_sha256() {
     let line_with_media =
         format!(r#"{base},"media":[{{"format":"CD","format-id":"fmt-4","position":1,"title":null,"track-count":9,"tracks":[]}}]}}"#);
 
-    let msg_no_media = parse_mb_release_line(&line_no_media).unwrap();
-    let msg_with_media = parse_mb_release_line(&line_with_media).unwrap();
+    let msg_no_media = parse_mb_release_line(&line_no_media, TEST_DUMP_VERSION).unwrap();
+    let msg_with_media = parse_mb_release_line(&line_with_media, TEST_DUMP_VERSION).unwrap();
 
     assert_ne!(msg_no_media.sha256, msg_with_media.sha256, "sha256 must change when media differ");
     assert_eq!(msg_with_media.sha256, calculate_content_hash(&msg_with_media.data));
@@ -405,7 +408,7 @@ fn test_parse_mb_release_line_media_raw_changes_sha256() {
 #[test]
 fn test_parse_mb_release_line_country_release_events_catalog_numbers() {
     let line = r#"{"id":"release-full","title":"Full Release","barcode":null,"country":"GB","status":"Official","release-group":{"id":"rg-7"},"relations":[],"release-events":[{"date":"1969-09-26","area":{"id":"area-1","name":"United Kingdom"}},{"date":"1969-10-01","area":{"id":"area-2","name":"United States"}}],"label-info":[{"catalog-number":"PCS 7088","label":{"id":"label-1","name":"Parlophone"}},{"catalog-number":"SO-383","label":{"id":"label-2","name":"Apple"}}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
 
     assert_eq!(msg.data["country"], "GB");
 
@@ -431,7 +434,7 @@ fn test_parse_mb_release_line_country_release_events_catalog_numbers() {
 #[test]
 fn test_parse_mb_release_line_no_country_events_or_catalog_numbers() {
     let line = r#"{"id":"release-empty","title":"No Extras","barcode":null,"status":"Official","release-group":{"id":"rg-8"},"relations":[]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
 
     assert!(msg.data["country"].is_null());
     assert!(msg.data["release_events"].as_array().unwrap().is_empty());
@@ -443,7 +446,7 @@ fn test_parse_mb_release_line_drops_malformed_release_events_and_catalog_numbers
     // A release-event with neither `date` nor `area` carries nothing and is dropped;
     // a label-info entry without a `catalog-number` carries no identifier and is dropped.
     let line = r#"{"id":"release-malformed","title":"Malformed Release","barcode":null,"status":"Official","release-group":{"id":"rg-9"},"relations":[],"release-events":[{},{"date":"1970-01-01","area":{"id":"area-3","name":"France"}}],"label-info":[{"label":{"id":"label-3","name":"No Catalog Label"}},{"catalog-number":"CAT-1","label":{"id":"label-4","name":"Good Label"}}]}"#;
-    let msg = parse_mb_release_line(line).unwrap();
+    let msg = parse_mb_release_line(line, TEST_DUMP_VERSION).unwrap();
 
     let events = msg.data["release_events"].as_array().unwrap();
     assert_eq!(events.len(), 1, "the all-null release-event entry must be dropped");
@@ -462,8 +465,8 @@ fn test_parse_mb_release_line_country_changes_sha256() {
     let line_no_country = format!("{base}}}");
     let line_with_country = format!(r#"{base},"country":"US"}}"#);
 
-    let msg_no_country = parse_mb_release_line(&line_no_country).unwrap();
-    let msg_with_country = parse_mb_release_line(&line_with_country).unwrap();
+    let msg_no_country = parse_mb_release_line(&line_no_country, TEST_DUMP_VERSION).unwrap();
+    let msg_with_country = parse_mb_release_line(&line_with_country, TEST_DUMP_VERSION).unwrap();
 
     assert_ne!(msg_no_country.sha256, msg_with_country.sha256, "sha256 must change when country differs");
     assert_eq!(msg_with_country.sha256, calculate_content_hash(&msg_with_country.data));
@@ -475,8 +478,8 @@ fn test_parse_mb_release_line_release_events_change_sha256() {
     let line_no_events = format!("{base}}}");
     let line_with_events = format!(r#"{base},"release-events":[{{"date":"1971-01-01","area":{{"id":"area-4","name":"Germany"}}}}]}}"#);
 
-    let msg_no_events = parse_mb_release_line(&line_no_events).unwrap();
-    let msg_with_events = parse_mb_release_line(&line_with_events).unwrap();
+    let msg_no_events = parse_mb_release_line(&line_no_events, TEST_DUMP_VERSION).unwrap();
+    let msg_with_events = parse_mb_release_line(&line_with_events, TEST_DUMP_VERSION).unwrap();
 
     assert_ne!(msg_no_events.sha256, msg_with_events.sha256, "sha256 must change when release_events differ");
     assert_eq!(msg_with_events.sha256, calculate_content_hash(&msg_with_events.data));
@@ -488,8 +491,8 @@ fn test_parse_mb_release_line_catalog_numbers_change_sha256() {
     let line_no_catalog = format!("{base}}}");
     let line_with_catalog = format!(r#"{base},"label-info":[{{"catalog-number":"CAT-2","label":{{"id":"label-5","name":"Hash Label"}}}}]}}"#);
 
-    let msg_no_catalog = parse_mb_release_line(&line_no_catalog).unwrap();
-    let msg_with_catalog = parse_mb_release_line(&line_with_catalog).unwrap();
+    let msg_no_catalog = parse_mb_release_line(&line_no_catalog, TEST_DUMP_VERSION).unwrap();
+    let msg_with_catalog = parse_mb_release_line(&line_with_catalog, TEST_DUMP_VERSION).unwrap();
 
     assert_ne!(msg_no_catalog.sha256, msg_with_catalog.sha256, "sha256 must change when catalog_numbers differ");
     assert_eq!(msg_with_catalog.sha256, calculate_content_hash(&msg_with_catalog.data));
@@ -497,7 +500,7 @@ fn test_parse_mb_release_line_catalog_numbers_change_sha256() {
 
 #[test]
 fn test_parse_mb_release_line_true_invalid_json() {
-    let result = parse_mb_release_line("definitely not json");
+    let result = parse_mb_release_line("definitely not json", TEST_DUMP_VERSION);
     assert!(result.is_err());
 }
 
@@ -506,7 +509,7 @@ fn test_parse_mb_release_line_true_invalid_json() {
 #[test]
 fn test_parse_mb_release_group_line_with_discogs() {
     let line = r#"{"id":"1dc4c347-a1db-32aa-b14f-bc9cc507b843","title":"Abbey Road","primary-type":"Album","secondary-types":["Compilation"],"first-release-date":"1969-09-26","disambiguation":"","relations":[{"type":"discogs","target-type":"url","url":{"resource":"https://www.discogs.com/master/23853"}},{"type":"wikipedia","target-type":"url","url":{"resource":"https://en.wikipedia.org/wiki/Abbey_Road"}}]}"#;
-    let msg = parse_mb_release_group_line(line).unwrap();
+    let msg = parse_mb_release_group_line(line, TEST_DUMP_VERSION).unwrap();
     assert_eq!(msg.id, "1dc4c347-a1db-32aa-b14f-bc9cc507b843");
     assert_eq!(msg.data["discogs_master_id"], 23853);
     assert_eq!(msg.data["name"], "Abbey Road");
@@ -524,7 +527,7 @@ fn test_parse_mb_release_group_line_with_discogs() {
 #[test]
 fn test_parse_mb_release_group_line_no_discogs() {
     let line = r#"{"id":"rg-mbid","title":"Unknown Album","primary-type":"Album","secondary-types":[],"first-release-date":"2020","disambiguation":"test","relations":[]}"#;
-    let msg = parse_mb_release_group_line(line).unwrap();
+    let msg = parse_mb_release_group_line(line, TEST_DUMP_VERSION).unwrap();
     assert!(msg.data["discogs_master_id"].is_null());
     assert_eq!(msg.data["name"], "Unknown Album");
     assert_eq!(msg.data["mb_type"], "Album");
@@ -532,7 +535,7 @@ fn test_parse_mb_release_group_line_no_discogs() {
 
 #[test]
 fn test_parse_mb_release_group_line_invalid_json() {
-    let result = parse_mb_release_group_line("not valid json");
+    let result = parse_mb_release_group_line("not valid json", TEST_DUMP_VERSION);
     assert!(result.is_err());
 }
 
@@ -548,9 +551,9 @@ fn test_parse_mb_artist_line_sha256_deterministic_and_differs() {
     let line_a = r#"{"id":"artist-1","name":"A","sort-name":"A","type":"Person","gender":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
     let line_b = r#"{"id":"artist-1","name":"B","sort-name":"B","type":"Person","gender":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"begin-area":null,"end-area":null,"disambiguation":"","aliases":[],"tags":[],"relations":[]}"#;
 
-    let msg_a1 = parse_mb_artist_line(line_a).unwrap();
-    let msg_a2 = parse_mb_artist_line(line_a).unwrap();
-    let msg_b = parse_mb_artist_line(line_b).unwrap();
+    let msg_a1 = parse_mb_artist_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_a2 = parse_mb_artist_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_b = parse_mb_artist_line(line_b, TEST_DUMP_VERSION).unwrap();
 
     assert_valid_sha256(&msg_a1.sha256);
     assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
@@ -563,9 +566,9 @@ fn test_parse_mb_label_line_sha256_deterministic_and_differs() {
     let line_a = r#"{"id":"label-1","name":"A","type":"Imprint","label-code":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"disambiguation":"","relations":[]}"#;
     let line_b = r#"{"id":"label-1","name":"B","type":"Imprint","label-code":null,"life-span":{"begin":null,"end":null,"ended":false},"area":null,"disambiguation":"","relations":[]}"#;
 
-    let msg_a1 = parse_mb_label_line(line_a).unwrap();
-    let msg_a2 = parse_mb_label_line(line_a).unwrap();
-    let msg_b = parse_mb_label_line(line_b).unwrap();
+    let msg_a1 = parse_mb_label_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_a2 = parse_mb_label_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_b = parse_mb_label_line(line_b, TEST_DUMP_VERSION).unwrap();
 
     assert_valid_sha256(&msg_a1.sha256);
     assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
@@ -578,9 +581,9 @@ fn test_parse_mb_release_line_sha256_deterministic_and_differs() {
     let line_a = r#"{"id":"release-1","title":"A","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[]}"#;
     let line_b = r#"{"id":"release-1","title":"B","barcode":null,"status":"Official","release-group":{"id":"rg-1"},"relations":[]}"#;
 
-    let msg_a1 = parse_mb_release_line(line_a).unwrap();
-    let msg_a2 = parse_mb_release_line(line_a).unwrap();
-    let msg_b = parse_mb_release_line(line_b).unwrap();
+    let msg_a1 = parse_mb_release_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_a2 = parse_mb_release_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_b = parse_mb_release_line(line_b, TEST_DUMP_VERSION).unwrap();
 
     assert_valid_sha256(&msg_a1.sha256);
     assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
@@ -595,14 +598,86 @@ fn test_parse_mb_release_group_line_sha256_deterministic_and_differs() {
     let line_b =
         r#"{"id":"rg-1","title":"B","primary-type":"Album","secondary-types":[],"first-release-date":"2020","disambiguation":"","relations":[]}"#;
 
-    let msg_a1 = parse_mb_release_group_line(line_a).unwrap();
-    let msg_a2 = parse_mb_release_group_line(line_a).unwrap();
-    let msg_b = parse_mb_release_group_line(line_b).unwrap();
+    let msg_a1 = parse_mb_release_group_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_a2 = parse_mb_release_group_line(line_a, TEST_DUMP_VERSION).unwrap();
+    let msg_b = parse_mb_release_group_line(line_b, TEST_DUMP_VERSION).unwrap();
 
     assert_valid_sha256(&msg_a1.sha256);
     assert_eq!(msg_a1.sha256, msg_a2.sha256, "identical input must hash identically");
     assert_eq!(msg_a1.sha256, calculate_content_hash(&msg_a1.data));
     assert_ne!(msg_a1.sha256, msg_b.sha256, "differing input must hash differently");
+}
+
+// ─── dump_version ────────────────────────────────────────────────────────────
+
+/// One minimal valid line per entity kind, so a test can cover every kind the same way.
+fn minimal_line(data_type: DataType) -> &'static str {
+    match data_type {
+        DataType::Artists => r#"{"id":"mbid-a","name":"Artist","sort-name":"Artist","type":"Person","relations":[]}"#,
+        DataType::Labels => r#"{"id":"mbid-l","name":"Label","type":"Original Production","relations":[]}"#,
+        DataType::ReleaseGroups => r#"{"id":"mbid-rg","title":"Group","primary-type":"Album","relations":[]}"#,
+        DataType::Releases => r#"{"id":"mbid-r","title":"Release","status":"Official","relations":[]}"#,
+        DataType::Masters => unreachable!("MusicBrainz has no masters"),
+    }
+}
+
+fn parse_minimal(data_type: DataType, dump_version: &str) -> DataMessage {
+    let line = minimal_line(data_type);
+    match data_type {
+        DataType::Artists => parse_mb_artist_line(line, dump_version),
+        DataType::Labels => parse_mb_label_line(line, dump_version),
+        DataType::ReleaseGroups => parse_mb_release_group_line(line, dump_version),
+        DataType::Releases => parse_mb_release_line(line, dump_version),
+        DataType::Masters => unreachable!("MusicBrainz has no masters"),
+    }
+    .unwrap()
+}
+
+#[test]
+fn test_every_entity_kind_carries_dump_version_on_the_wire() {
+    for data_type in DataType::musicbrainz() {
+        let wire: Value = serde_json::to_value(crate::types::Message::Data(parse_minimal(data_type, "20260101-000000"))).unwrap();
+        assert_eq!(wire["type"], "data", "{data_type}");
+        let field = crate::generated::catalog_contract::DUMP_VERSION_FIELD;
+        assert_eq!(wire[field], "20260101-000000", "{data_type} must carry {field} as a top-level string");
+    }
+}
+
+#[test]
+fn test_dump_version_is_outside_the_content_hash() {
+    // A record that is unchanged between two dumps must keep its hash, or consumers could
+    // no longer tell "re-published" from "changed".
+    for data_type in DataType::musicbrainz() {
+        let older = parse_minimal(data_type, "20260101-000000");
+        let newer = parse_minimal(data_type, "20260201-000000");
+        assert_eq!(older.sha256, newer.sha256, "{data_type}: dump_version must not feed sha256");
+        assert_ne!(older.dump_version, newer.dump_version, "{data_type}");
+    }
+}
+
+#[test]
+fn test_parse_mb_jsonl_file_stamps_every_message_with_dump_version() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+    use tokio::sync::mpsc;
+    use xz2::write::XzEncoder;
+
+    let content = format!("{}\n{}\n", minimal_line(DataType::Labels), minimal_line(DataType::Labels).replace("mbid-l", "mbid-l2"));
+    let mut temp_file = NamedTempFile::new().unwrap();
+    let mut encoder = XzEncoder::new(Vec::new(), 1);
+    encoder.write_all(content.as_bytes()).unwrap();
+    temp_file.write_all(&encoder.finish().unwrap()).unwrap();
+    temp_file.flush().unwrap();
+
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let (sender, mut receiver) = mpsc::channel(10);
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Labels, sender, None, "20260301-000000").unwrap();
+    assert_eq!(count, 2);
+
+    for _ in 0..2 {
+        let msg = rt.block_on(receiver.recv()).unwrap();
+        assert_eq!(msg.dump_version, "20260301-000000");
+    }
 }
 
 // ─── parse_mb_jsonl_file (integration via in-memory xz) ─────────────────────
@@ -627,7 +702,7 @@ fn test_parse_mb_jsonl_file_artists() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None, TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 2);
 
     let msg1 = rt.block_on(receiver.recv()).unwrap();
@@ -657,7 +732,7 @@ fn test_parse_mb_jsonl_file_skips_malformed_lines() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None, TEST_DUMP_VERSION).unwrap();
     // Only the good line should be counted
     assert_eq!(count, 1);
     let msg = rt.block_on(receiver.recv()).unwrap();
@@ -679,7 +754,7 @@ fn test_parse_mb_jsonl_file_masters_returns_zero() {
     temp_file.flush().unwrap();
 
     let (sender, _receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Masters, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Masters, sender, None, TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 0);
 }
 
@@ -802,7 +877,7 @@ fn test_parse_mb_jsonl_file_with_discogs_map_enriches_relations() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, Some(&map)).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, Some(&map), TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 1);
 
     let msg = rt.block_on(receiver.recv()).unwrap();
@@ -852,7 +927,7 @@ fn test_parse_mb_jsonl_file_labels() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Labels, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Labels, sender, None, TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 1);
 
     let msg = rt.block_on(receiver.recv()).unwrap();
@@ -880,7 +955,7 @@ fn test_parse_mb_jsonl_file_releases() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Releases, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Releases, sender, None, TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 1);
 
     let msg = rt.block_on(receiver.recv()).unwrap();
@@ -911,7 +986,7 @@ fn test_parse_mb_jsonl_file_with_empty_lines() {
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     let (sender, mut receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None, TEST_DUMP_VERSION).unwrap();
     assert_eq!(count, 1);
 
     let msg = rt.block_on(receiver.recv()).unwrap();
@@ -978,7 +1053,7 @@ fn test_parse_mb_jsonl_file_receiver_dropped() {
     drop(receiver);
 
     // Should stop gracefully without error — returns count of records sent before drop
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None).unwrap();
+    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Artists, sender, None, TEST_DUMP_VERSION).unwrap();
     // Count should be 0 since the very first blocking_send should fail (receiver dropped)
     assert_eq!(count, 0);
 }
@@ -1057,7 +1132,7 @@ fn test_parse_mb_jsonl_file_truncated_xz_is_fatal_not_busyloop() {
         // Generous channel so blocking_send never blocks; we want the read error, not backpressure.
         let (sender, _receiver) = mpsc::channel(100_000);
         // Keep the receiver alive for the duration of the parse.
-        let result = parse_mb_jsonl_file(&path, DataType::Artists, sender, None);
+        let result = parse_mb_jsonl_file(&path, DataType::Artists, sender, None, TEST_DUMP_VERSION);
         let _ = tx.send(result.is_err());
         drop(_receiver);
     });

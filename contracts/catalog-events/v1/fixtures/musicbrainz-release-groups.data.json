@@ -1,4 +1,5 @@
 {
+  "dump_version": "contract-fixture",
   "id": "contract-musicbrainz-release-groups",
   "mb_type": "Album",
   "name": "Contract Release Group",

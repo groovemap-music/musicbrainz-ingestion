@@ -13,6 +13,24 @@ The contract preserves the `groovemap-musicbrainz` exchange prefix and the artis
 labels, release-groups, and releases entity vocabulary. Consumer repositories promote
 artifacts from a reviewed immutable commit rather than editing generated output.
 
+## Data message `dump_version`
+
+Every `data` message carries `dump_version`, a non-empty string naming the MusicBrainz dump
+version the record was extracted from. It is exactly the `version` the same extraction's
+`extraction_complete` message carries, so a consumer can attribute each record to its dump
+when it processes the record instead of waiting for the completion signal, which arrives
+after all of an extraction's records.
+
+It is additive within contract v1: `data` events already allow additional properties, a
+consumer built before it existed ignores it, and `schemas/event.schema.json` declares it
+without making it required. A message published before this field existed has none, so a
+consumer that depends on it must handle its absence. The producer sets it on every entity
+kind, and it stays outside the `sha256` content hash, so an unchanged record keeps its hash
+from one dump to the next. `just contract` writes the field name into the generated
+bindings (`DUMP_VERSION_FIELD`), and `just contract-check` fails if the schema stops
+declaring it. `definitions/musicbrainz.json`'s `fixture_dump_version` is the version the
+generated data fixtures and the `extraction-complete` fixture share.
+
 ## Release media fields
 
 `releases` events carry two media fields, both additive within contract v1 -- a consumer

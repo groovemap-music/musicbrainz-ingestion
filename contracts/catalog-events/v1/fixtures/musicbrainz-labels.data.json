@@ -1,4 +1,5 @@
 {
+  "dump_version": "contract-fixture",
   "id": "contract-musicbrainz-labels",
   "mb_type": "Original Production",
   "name": "Contract Label",

@@ -8,6 +8,7 @@
     }
   ],
   "country": "GB",
+  "dump_version": "contract-fixture",
   "id": "contract-musicbrainz-releases",
   "identifiers": {
     "aliases": [

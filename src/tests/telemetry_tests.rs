@@ -74,7 +74,13 @@ fn assert_instrument(observations: &[(String, BTreeSet<String>)], name: &str, ex
 }
 
 fn sample_message(id: &str) -> DataMessage {
-    DataMessage { id: id.to_string(), sha256: String::new(), data: serde_json::json!({"name": id}), raw_xml: None }
+    DataMessage {
+        id: id.to_string(),
+        sha256: String::new(),
+        data: serde_json::json!({"name": id}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    }
 }
 
 fn batcher_config(batch_size: usize, temp: &tempfile::TempDir) -> BatcherConfig {

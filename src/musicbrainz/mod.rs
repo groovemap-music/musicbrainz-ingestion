@@ -318,9 +318,10 @@ pub async fn process_musicbrainz_data(
         // INSIDE the closure, which is where the parse actually runs — `spawn_blocking` does
         // not carry the current span across the thread boundary any more than `spawn` does.
         let parse_span = extract_span.in_scope(telemetry::parse_span);
+        let parser_version = version.clone();
         let parser_handle = tokio::task::spawn_blocking(move || {
             let _entered = parse_span.enter();
-            parse_mb_jsonl_file(&parser_path, parser_dt, parse_sender, parser_map.as_ref())
+            parse_mb_jsonl_file(&parser_path, parser_dt, parse_sender, parser_map.as_ref(), &parser_version)
         });
 
         // Spawn batcher — share the same state_marker Arc across all iterations

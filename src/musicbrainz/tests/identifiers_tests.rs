@@ -31,13 +31,13 @@ fn malformed_and_empty_are_schema_shaped() {
 #[test]
 fn identifiers_are_hashed_and_raw_fields_survive() {
     let release = json!({"id":"release", "title":"Title", "barcode":"07599251581", "label-info":[{"catalog-number":"1-25158"}], "relations":[]});
-    let original = parse_mb_release_line(&release.to_string()).unwrap();
+    let original = parse_mb_release_line(&release.to_string(), "20260101").unwrap();
     assert_eq!(original.data["barcode"], "07599251581");
     assert_eq!(original.data["catalog_numbers"][0]["catalog_number"], "1-25158");
     assert_eq!(original.sha256, calculate_content_hash(&original.data));
     let mut changed = release.clone();
     changed["barcode"] = json!("07599251582");
-    let changed = parse_mb_release_line(&changed.to_string()).unwrap();
+    let changed = parse_mb_release_line(&changed.to_string(), "20260101").unwrap();
     assert_ne!(original.sha256, changed.sha256);
     assert_ne!(original.data["identifiers"], changed.data["identifiers"]);
     let mut block_changed = original.data.clone();
