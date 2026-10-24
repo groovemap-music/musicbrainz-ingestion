@@ -231,7 +231,8 @@ fn find_discogs_id(url_rels: &[Value], entity_type: &str) -> Value {
 ///
 /// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
 /// immediately before constructing the returned [`DataMessage`] — never left empty.
-pub fn parse_mb_artist_line(line: &str) -> Result<DataMessage> {
+/// `dump_version` is stamped on the message as given and is not part of the hash.
+pub fn parse_mb_artist_line(line: &str, dump_version: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse artist JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
@@ -270,14 +271,15 @@ pub fn parse_mb_artist_line(line: &str) -> Result<DataMessage> {
 
     let sha256 = calculate_content_hash(&data);
 
-    Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
+    Ok(DataMessage { id: mbid, sha256, dump_version: dump_version.to_string(), data, raw_xml: None })
 }
 
 /// Parse a single MusicBrainz JSONL label line into a [`DataMessage`].
 ///
 /// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
 /// immediately before constructing the returned [`DataMessage`] — never left empty.
-pub fn parse_mb_label_line(line: &str) -> Result<DataMessage> {
+/// `dump_version` is stamped on the message as given and is not part of the hash.
+pub fn parse_mb_label_line(line: &str, dump_version: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse label JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
@@ -309,7 +311,7 @@ pub fn parse_mb_label_line(line: &str) -> Result<DataMessage> {
 
     let sha256 = calculate_content_hash(&data);
 
-    Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
+    Ok(DataMessage { id: mbid, sha256, dump_version: dump_version.to_string(), data, raw_xml: None })
 }
 
 /// Partition a flat `relations` array into URL-type relations (those with `"target-type": "url"`).
@@ -317,7 +319,8 @@ pub fn parse_mb_label_line(line: &str) -> Result<DataMessage> {
 ///
 /// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
 /// immediately before constructing the returned [`DataMessage`] — never left empty.
-pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
+/// `dump_version` is stamped on the message as given and is not part of the hash.
+pub fn parse_mb_release_line(line: &str, dump_version: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse release JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
@@ -361,14 +364,15 @@ pub fn parse_mb_release_line(line: &str) -> Result<DataMessage> {
 
     let sha256 = calculate_content_hash(&data);
 
-    Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
+    Ok(DataMessage { id: mbid, sha256, dump_version: dump_version.to_string(), data, raw_xml: None })
 }
 
 /// Parse a single MusicBrainz JSONL release-group line into a [`DataMessage`].
 ///
 /// `sha256` is [`calculate_content_hash`] of the final `data` value, computed
 /// immediately before constructing the returned [`DataMessage`] — never left empty.
-pub fn parse_mb_release_group_line(line: &str) -> Result<DataMessage> {
+/// `dump_version` is stamped on the message as given and is not part of the hash.
+pub fn parse_mb_release_group_line(line: &str, dump_version: &str) -> Result<DataMessage> {
     let v: Value = serde_json::from_str(line).context("Failed to parse release-group JSONL line")?;
 
     let mbid = v["id"].as_str().unwrap_or("unknown").to_string();
@@ -392,7 +396,7 @@ pub fn parse_mb_release_group_line(line: &str) -> Result<DataMessage> {
 
     let sha256 = calculate_content_hash(&data);
 
-    Ok(DataMessage { id: mbid, sha256, data, raw_xml: None })
+    Ok(DataMessage { id: mbid, sha256, dump_version: dump_version.to_string(), data, raw_xml: None })
 }
 
 /// First pass: build a map of MBID → Discogs ID by scanning URL relations in a JSONL file.
@@ -504,6 +508,8 @@ pub fn enrich_relations(relations: Vec<Value>, discogs_map: &HashMap<String, i64
 /// When `discogs_map` is `Some`, artist relation targets are enriched with
 /// `target_discogs_artist_id` using the provided MBID→Discogs ID lookup map.
 ///
+/// Every message is stamped with `dump_version`, the version of the dump `path` belongs to.
+///
 /// Sends each successfully parsed [`DataMessage`] through `sender`.
 /// Malformed lines are skipped with a debug log.
 /// Returns the total count of records successfully parsed and sent.
@@ -512,10 +518,11 @@ pub fn parse_mb_jsonl_file(
     data_type: DataType,
     sender: mpsc::Sender<DataMessage>,
     discogs_map: Option<&HashMap<String, i64>>,
+    dump_version: &str,
 ) -> Result<u64> {
     let reader = open_jsonl_reader(path, Some(data_type.as_str())).context(format!("Failed to open JSONL file: {:?}", path))?;
 
-    let parse_fn: fn(&str) -> Result<DataMessage> = match data_type {
+    let parse_fn: fn(&str, &str) -> Result<DataMessage> = match data_type {
         DataType::Artists => parse_mb_artist_line,
         DataType::Labels => parse_mb_label_line,
         DataType::Releases => parse_mb_release_line,
@@ -542,7 +549,7 @@ pub fn parse_mb_jsonl_file(
         if trimmed.is_empty() {
             continue;
         }
-        match parse_fn(trimmed) {
+        match parse_fn(trimmed, dump_version) {
             Ok(mut msg) => {
                 // Enrich relations with target Discogs IDs when a map is provided
                 if let Some(map) = discogs_map

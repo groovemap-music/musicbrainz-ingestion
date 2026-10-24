@@ -87,8 +87,13 @@ async fn test_message_batcher_basic() {
     let state_marker = Arc::new(tokio::sync::Mutex::new(StateMarker::new("20230101".to_string())));
 
     for i in 0..5 {
-        let message =
-            DataMessage { sha256: format!("sha{}", i), data: serde_json::json!({ "test": format!("test{}", i) }), id: i.to_string(), raw_xml: None };
+        let message = DataMessage {
+            sha256: format!("sha{}", i),
+            data: serde_json::json!({ "test": format!("test{}", i) }),
+            id: i.to_string(),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         parse_sender.send(message).await.unwrap();
     }
     drop(parse_sender);
@@ -134,8 +139,13 @@ async fn test_message_batcher_respects_batch_size() {
     // Send exactly batch_size messages
     let batch_size = 10;
     for i in 0..batch_size {
-        let message =
-            DataMessage { sha256: format!("sha{}", i), data: serde_json::json!({ "test": format!("test{}", i) }), id: i.to_string(), raw_xml: None };
+        let message = DataMessage {
+            sha256: format!("sha{}", i),
+            data: serde_json::json!({ "test": format!("test{}", i) }),
+            id: i.to_string(),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         parse_sender.send(message).await.unwrap();
     }
     drop(parse_sender);
@@ -173,8 +183,13 @@ async fn test_message_batcher_timeout_flush() {
 
     // Send fewer messages than batch size
     for i in 0..3 {
-        let message =
-            DataMessage { sha256: format!("sha{}", i), data: serde_json::json!({ "test": format!("test{}", i) }), id: i.to_string(), raw_xml: None };
+        let message = DataMessage {
+            sha256: format!("sha{}", i),
+            data: serde_json::json!({ "test": format!("test{}", i) }),
+            id: i.to_string(),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         parse_sender.send(message).await.unwrap();
     }
 
@@ -391,7 +406,13 @@ async fn test_message_batcher_triggers_state_save() {
     // state_save_interval = 5, send exactly 5 messages to trigger a save
     let save_interval = 5usize;
     for i in 0..save_interval {
-        let message = DataMessage { id: i.to_string(), sha256: format!("hash{i}"), data: serde_json::json!({}), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("hash{i}"),
+            data: serde_json::json!({}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         parse_sender.send(message).await.unwrap();
     }
     drop(parse_sender);
@@ -520,8 +541,13 @@ async fn test_message_batcher_multiple_batch_sizes() {
 
     // Send 25 messages with batch_size=10 => expect 3 batches (10, 10, 5)
     for i in 0..25 {
-        let message =
-            DataMessage { id: i.to_string(), sha256: format!("sha{}", i), data: serde_json::json!({ "test": format!("test{}", i) }), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("sha{}", i),
+            data: serde_json::json!({ "test": format!("test{}", i) }),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         parse_sender.send(message).await.unwrap();
     }
     drop(parse_sender);

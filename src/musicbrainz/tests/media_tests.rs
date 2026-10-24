@@ -543,7 +543,7 @@ fn release_line(format: &str, status: &str) -> String {
 /// already emits plus the release-level values it reads straight from the dump line.
 #[test]
 fn test_parser_attaches_the_block_to_releases() {
-    let message = parse_mb_release_line(&release_line("12\" Vinyl", "Promotion")).expect("the release line parses");
+    let message = parse_mb_release_line(&release_line("12\" Vinyl", "Promotion"), "20260101").expect("the release line parses");
 
     assert_eq!(message.data["media"]["items"][0]["medium"], json!("vinyl_12"));
     assert_eq!(message.data["media"]["items"][0]["position"], json!(1));
@@ -562,9 +562,9 @@ fn test_parser_attaches_the_block_to_releases() {
 /// content hash consumers key change detection on.
 #[test]
 fn test_hash_covers_the_media_block() {
-    let vinyl = parse_mb_release_line(&release_line("12\" Vinyl", "Official")).expect("the release line parses");
-    let compact = parse_mb_release_line(&release_line("CD", "Official")).expect("the release line parses");
-    let vinyl_again = parse_mb_release_line(&release_line("12\" Vinyl", "Official")).expect("the release line parses");
+    let vinyl = parse_mb_release_line(&release_line("12\" Vinyl", "Official"), "20260101").expect("the release line parses");
+    let compact = parse_mb_release_line(&release_line("CD", "Official"), "20260101").expect("the release line parses");
+    let vinyl_again = parse_mb_release_line(&release_line("12\" Vinyl", "Official"), "20260101").expect("the release line parses");
 
     assert_ne!(vinyl.sha256, compact.sha256, "a different resolved medium must change the hash");
     assert_eq!(vinyl.sha256, vinyl_again.sha256, "the same record must hash the same");
@@ -578,8 +578,8 @@ fn test_hash_covers_the_media_block() {
 /// block: `status` travels twice, raw and mapped, and both are inside the hash.
 #[test]
 fn test_hash_covers_a_release_level_change() {
-    let official = parse_mb_release_line(&release_line("CD", "Official")).expect("the release line parses");
-    let bootleg = parse_mb_release_line(&release_line("CD", "Bootleg")).expect("the release line parses");
+    let official = parse_mb_release_line(&release_line("CD", "Official"), "20260101").expect("the release line parses");
+    let bootleg = parse_mb_release_line(&release_line("CD", "Bootleg"), "20260101").expect("the release line parses");
 
     assert_eq!(official.data["media"]["edition"], json!([]));
     assert_eq!(bootleg.data["media"]["edition"], json!(["unofficial"]));

@@ -143,6 +143,10 @@ pub fn calculate_content_hash(data: &serde_json::Value) -> String {
 pub struct DataMessage {
     pub id: String,
     pub sha256: String,
+    /// The MusicBrainz dump version this record was extracted from: the same value the
+    /// extraction's `extraction_complete` message carries as `version`. Deliberately outside
+    /// the `sha256` content hash, so a record that is unchanged between dumps keeps its hash.
+    pub dump_version: String,
     #[serde(flatten)]
     pub data: serde_json::Value,
     /// Raw XML fragment for data quality inspection; never serialized to AMQP
