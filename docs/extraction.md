@@ -61,6 +61,11 @@ as `null` and `release_events`/`catalog_numbers` as empty arrays — never a mis
 and all three are computed before the content hash, so a change to any of them changes
 `sha256`.
 
+Every data event, of every entity kind, also carries `dump_version`: the dump version the
+record was extracted from, the same value this extraction's `extraction_complete` carries
+as `version`. It is set by the parser from the version the run resolved at download time and
+is not part of the `sha256` content hash.
+
 Unknown vocabulary values remain under `media.unmapped`. The mapping implementation is
 `src/musicbrainz/media.rs`, and its conformance fixtures are under
 `src/musicbrainz/tests/fixtures/media/`. See the [catalog event contract](../contracts/catalog-events/README.md)

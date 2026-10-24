@@ -107,7 +107,13 @@ fn test_normalize_amqp_url_with_query_params() {
 
 #[test]
 fn test_message_serialization_data() {
-    let data_msg = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: serde_json::json!({"key": "value"}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "123".to_string(),
+        sha256: "abc".to_string(),
+        data: serde_json::json!({"key": "value"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let message = Message::Data(data_msg);
     let serialized = serde_json::to_vec(&message).unwrap();
@@ -235,8 +241,13 @@ fn test_file_complete_message_serialization_format() {
 
 #[test]
 fn test_data_message_serialization_format() {
-    let data_msg =
-        DataMessage { id: "456".to_string(), sha256: "deadbeef".to_string(), data: serde_json::json!({"name": "Test Artist"}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "456".to_string(),
+        sha256: "deadbeef".to_string(),
+        data: serde_json::json!({"name": "Test Artist"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let message = Message::Data(data_msg);
     let json_str = serde_json::to_string(&message).unwrap();

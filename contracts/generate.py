@@ -16,6 +16,9 @@ DEFINITION_PATH = EVENTS_ROOT / "definitions" / "musicbrainz.json"
 CONTRACT_ROOT = EVENTS_ROOT / "v1"
 SCHEMA_PATH = CONTRACT_ROOT / "schemas" / "event.schema.json"
 SOURCE = "musicbrainz"
+# The additive v1 field every data message carries: the dump version the record came from,
+# equal to the `version` of that extraction's extraction_complete message.
+DUMP_VERSION_FIELD = "dump_version"
 
 # The media taxonomy is vendored verbatim from the design repository (see
 # contracts/catalog-events/README.md); it is never generated or rewritten here.
@@ -73,6 +76,7 @@ def render_rust(manifest: dict[str, Any]) -> str:
 pub const CONTRACT_NAME: &str = {json.dumps(manifest["contract"])};
 pub const CONTRACT_VERSION: u32 = {manifest["version"]};
 pub const SOURCE: &str = {json.dumps(SOURCE)};
+pub const DUMP_VERSION_FIELD: &str = {json.dumps(DUMP_VERSION_FIELD)};
 pub const AMQP_EXCHANGE_TYPE: &str = {json.dumps(manifest["exchange"]["kind"])};
 pub const EXCHANGE_PREFIX_ENV: &str = {json.dumps(source["exchange_prefix_env"])};
 pub const DEFAULT_EXCHANGE_PREFIX: &str = {json.dumps(source["default_exchange_prefix"])};
@@ -90,6 +94,7 @@ from os import getenv
 CONTRACT_NAME = {json.dumps(manifest["contract"])}
 CONTRACT_VERSION = {manifest["version"]}
 SOURCE = {json.dumps(SOURCE)}
+DUMP_VERSION_FIELD = {json.dumps(DUMP_VERSION_FIELD)}
 AMQP_EXCHANGE_TYPE = {json.dumps(manifest["exchange"]["kind"])}
 ENTITY_TYPES = {json.dumps(source["entities"])}
 CONSUMERS = {json.dumps(sorted(manifest["consumers"]))}
@@ -116,6 +121,9 @@ def render_all() -> dict[Path, str]:
     if definition["source"]["name"] != SOURCE:
         raise ValueError("definition is not MusicBrainz-owned")
     manifest = source_manifest(definition)
+    # One version for the whole fixture extraction: the data fixtures carry it as
+    # `dump_version` and the extraction_complete fixture as `version`, as a real run does.
+    fixture_dump_version = definition["fixture_dump_version"]
     rendered = {
         CONTRACT_ROOT / "contract.json": json_text(manifest),
         CONTRACT_ROOT / "bindings" / "python" / "catalog_contract.py": render_python(manifest),
@@ -125,14 +133,14 @@ def render_all() -> dict[Path, str]:
             "timestamp": "2000-01-01T00:00:00Z", "total_processed": 1,
         }),
         CONTRACT_ROOT / "fixtures" / "extraction-complete.json": json_text({
-            "type": "extraction_complete", "version": "contract-fixture",
+            "type": "extraction_complete", "version": fixture_dump_version,
             "started_at": "2000-01-01T00:00:00Z", "timestamp": "2000-01-01T00:00:01Z",
             "record_counts": {"artists": 1},
         }),
     }
     for name, payload in definition["fixture_payloads"].items():
         rendered[CONTRACT_ROOT / "fixtures" / f"{SOURCE}-{name}.data.json"] = json_text(
-            {"type": "data", "id": f"contract-{SOURCE}-{name}", "sha256": "", **payload}
+            {"type": "data", "id": f"contract-{SOURCE}-{name}", "sha256": "", "dump_version": fixture_dump_version, **payload}
         )
     return rendered
 
@@ -176,6 +184,21 @@ def vendored_vocab_errors() -> list[str]:
     return errors
 
 
+def schema_errors() -> list[str]:
+    """Check that the hand-maintained event schema declares what the generated bindings name.
+
+    The schema is not generated, so without this the binding constant could drift from it.
+    """
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    data = schema["$defs"]["data"]
+    errors: list[str] = []
+    if DUMP_VERSION_FIELD not in data["properties"]:
+        errors.append(f"data events do not declare {DUMP_VERSION_FIELD}")
+    if DUMP_VERSION_FIELD in data["required"]:
+        errors.append(f"{DUMP_VERSION_FIELD} must stay optional so the change is additive within v1")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
@@ -199,6 +222,11 @@ def main() -> int:
     if stale:
         sys.stderr.write("stale MusicBrainz contract artifacts:\n")
         sys.stderr.write("".join(f"  {path.relative_to(ROOT)}\n" for path in stale))
+        return 1
+    schema_problems = schema_errors()
+    if schema_problems:
+        sys.stderr.write("event schema disagrees with the generated bindings:\n")
+        sys.stderr.write("".join(f"  {error}\n" for error in schema_problems))
         return 1
     vocab_errors = vendored_vocab_errors()
     if vocab_errors:

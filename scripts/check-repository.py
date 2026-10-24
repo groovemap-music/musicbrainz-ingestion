@@ -176,7 +176,7 @@ require("musicbrainz_file_path" in state_marker_source, "MusicBrainz state-marke
 contract_path = ROOT / "contracts" / "catalog-events" / "v1" / "contract.json"
 contract_digest = hashlib.sha256(contract_path.read_bytes()).hexdigest()
 require(
-    contract_digest == "f0c62ec3212ff7594d1e39a2dd73cb5519b944e0984558978791992c47313a2d",
+    contract_digest == "131d7e5b6ca4ae46298f0ae8c2bceeb7c0b55c6594534bca9c37d63db7aa9d32",
     "versioned MusicBrainz event contract bytes changed",
 )
 

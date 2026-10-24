@@ -109,13 +109,35 @@ fn test_extraction_progress_default() {
 
 #[test]
 fn test_message_serialization() {
-    let data_msg = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: serde_json::json!({"test": "value"}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "123".to_string(),
+        sha256: "abc".to_string(),
+        data: serde_json::json!({"test": "value"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let serialized = serde_json::to_string(&data_msg).unwrap();
     let deserialized: DataMessage = serde_json::from_str(&serialized).unwrap();
 
     assert_eq!(deserialized.id, "123");
     assert_eq!(deserialized.sha256, "abc");
+    assert_eq!(deserialized.dump_version, "20260101");
+}
+
+#[test]
+fn test_data_message_serializes_dump_version_beside_flattened_fields() {
+    let data_msg = DataMessage {
+        id: "1".to_string(),
+        sha256: "h".to_string(),
+        dump_version: "20260101".to_string(),
+        data: serde_json::json!({"name": "n"}),
+        raw_xml: None,
+    };
+
+    let wire = serde_json::to_value(Message::Data(data_msg)).unwrap();
+
+    assert_eq!(wire, serde_json::json!({"type": "data", "id": "1", "sha256": "h", "dump_version": "20260101", "name": "n"}));
 }
 
 #[test]
@@ -129,7 +151,13 @@ fn test_file_complete_message() {
 
 #[test]
 fn test_message_enum_data() {
-    let data_msg = DataMessage { id: "1".to_string(), sha256: "hash".to_string(), data: serde_json::json!({}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "1".to_string(),
+        sha256: "hash".to_string(),
+        data: serde_json::json!({}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let message = Message::Data(data_msg);
     match message {

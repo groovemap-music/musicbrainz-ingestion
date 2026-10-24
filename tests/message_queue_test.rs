@@ -5,7 +5,13 @@ use serde_json::json;
 
 #[test]
 fn test_data_message_serialization() {
-    let message = DataMessage { id: "123".to_string(), sha256: "abc123".to_string(), data: json!({"name": "Test Artist"}), raw_xml: None };
+    let message = DataMessage {
+        id: "123".to_string(),
+        sha256: "abc123".to_string(),
+        data: json!({"name": "Test Artist"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let serialized = serde_json::to_string(&message).unwrap();
     assert!(serialized.contains("\"id\":\"123\""));
@@ -14,11 +20,12 @@ fn test_data_message_serialization() {
 
 #[test]
 fn test_data_message_deserialization() {
-    let json_str = r#"{"id":"123","sha256":"abc123","name":"Test Artist"}"#;
+    let json_str = r#"{"id":"123","sha256":"abc123","dump_version":"20260101","name":"Test Artist"}"#;
     let message: DataMessage = serde_json::from_str(json_str).unwrap();
 
     assert_eq!(message.id, "123");
     assert_eq!(message.sha256, "abc123");
+    assert_eq!(message.dump_version, "20260101");
     assert!(message.data.get("name").is_some());
 }
 
@@ -39,7 +46,13 @@ fn test_file_complete_message_serialization() {
 
 #[test]
 fn test_message_enum_data_variant() {
-    let data_msg = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({"test": "value"}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "123".to_string(),
+        sha256: "abc".to_string(),
+        data: json!({"test": "value"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let message = Message::Data(data_msg);
     let serialized = serde_json::to_string(&message).unwrap();
@@ -60,7 +73,13 @@ fn test_message_enum_file_complete_variant() {
 
 #[test]
 fn test_message_serialization_round_trip() {
-    let data_msg = DataMessage { id: "test-id".to_string(), sha256: "test-sha".to_string(), data: json!({"field": "value"}), raw_xml: None };
+    let data_msg = DataMessage {
+        id: "test-id".to_string(),
+        sha256: "test-sha".to_string(),
+        data: json!({"field": "value"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let message = Message::Data(data_msg);
     let serialized = serde_json::to_string(&message).unwrap();
@@ -86,7 +105,13 @@ fn test_data_message_with_complex_data() {
         "array": [1, 2, 3]
     });
 
-    let message = DataMessage { id: "complex".to_string(), sha256: "hash".to_string(), data: complex_data, raw_xml: None };
+    let message = DataMessage {
+        id: "complex".to_string(),
+        sha256: "hash".to_string(),
+        data: complex_data,
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let serialized = serde_json::to_string(&message).unwrap();
     let deserialized: DataMessage = serde_json::from_str(&serialized).unwrap();
@@ -113,7 +138,8 @@ fn test_file_complete_message_timestamp() {
 
 #[test]
 fn test_message_type_tag() {
-    let data_msg = DataMessage { id: "1".to_string(), sha256: "hash".to_string(), data: json!({}), raw_xml: None };
+    let data_msg =
+        DataMessage { id: "1".to_string(), sha256: "hash".to_string(), data: json!({}), dump_version: "20260101".to_string(), raw_xml: None };
 
     let message = Message::Data(data_msg);
     let json_value = serde_json::to_value(&message).unwrap();
@@ -124,7 +150,13 @@ fn test_message_type_tag() {
 #[test]
 fn test_data_message_flattened_data() {
     // The data field is flattened, so it should be at the same level as id and sha256
-    let message = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({"custom_field": "custom_value"}), raw_xml: None };
+    let message = DataMessage {
+        id: "123".to_string(),
+        sha256: "abc".to_string(),
+        data: json!({"custom_field": "custom_value"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let json_value = serde_json::to_value(&message).unwrap();
 
@@ -171,7 +203,8 @@ fn test_data_type_from_str() {
 #[test]
 fn test_message_enum_tagged() {
     // Test that Message enum uses tagged format
-    let data_msg = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({}), raw_xml: None };
+    let data_msg =
+        DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({}), dump_version: "20260101".to_string(), raw_xml: None };
     let message = Message::Data(data_msg);
     let json_str = serde_json::to_string(&message).unwrap();
     assert!(json_str.contains("\"type\":\"data\""));
@@ -185,7 +218,8 @@ fn test_message_enum_tagged() {
 
 #[test]
 fn test_data_message_with_empty_data() {
-    let message = DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({}), raw_xml: None };
+    let message =
+        DataMessage { id: "123".to_string(), sha256: "abc".to_string(), data: json!({}), dump_version: "20260101".to_string(), raw_xml: None };
 
     let serialized = serde_json::to_string(&message).unwrap();
     let deserialized: DataMessage = serde_json::from_str(&serialized).unwrap();
@@ -225,7 +259,13 @@ fn test_data_message_large_data() {
         }
     });
 
-    let message = DataMessage { id: "large_test".to_string(), sha256: "hash123".to_string(), data: large_data.clone(), raw_xml: None };
+    let message = DataMessage {
+        id: "large_test".to_string(),
+        sha256: "hash123".to_string(),
+        data: large_data.clone(),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
 
     let serialized = serde_json::to_string(&message).unwrap();
     let deserialized: DataMessage = serde_json::from_str(&serialized).unwrap();
@@ -242,9 +282,27 @@ fn test_data_message_large_data() {
 #[test]
 fn test_message_batch_serialization() {
     let messages = [
-        DataMessage { id: "1".to_string(), sha256: "hash1".to_string(), data: json!({"field": "value1"}), raw_xml: None },
-        DataMessage { id: "2".to_string(), sha256: "hash2".to_string(), data: json!({"field": "value2"}), raw_xml: None },
-        DataMessage { id: "3".to_string(), sha256: "hash3".to_string(), data: json!({"field": "value3"}), raw_xml: None },
+        DataMessage {
+            id: "1".to_string(),
+            sha256: "hash1".to_string(),
+            data: json!({"field": "value1"}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        },
+        DataMessage {
+            id: "2".to_string(),
+            sha256: "hash2".to_string(),
+            data: json!({"field": "value2"}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        },
+        DataMessage {
+            id: "3".to_string(),
+            sha256: "hash3".to_string(),
+            data: json!({"field": "value3"}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        },
     ];
 
     // Serialize batch
@@ -279,6 +337,7 @@ fn test_message_size_estimation() {
             "name": "Test Artist",
             "members": vec!["member1", "member2", "member3"],
         }),
+        dump_version: "20260101".to_string(),
         raw_xml: None,
     };
 
@@ -311,4 +370,24 @@ fn test_file_complete_message_with_large_count() {
     let deserialized: FileCompleteMessage = serde_json::from_str(&serialized).unwrap();
 
     assert_eq!(deserialized.total_processed, 1_000_000_000);
+}
+
+/// The generated contract fixtures show `dump_version` on every entity kind, equal to the
+/// version the extraction_complete fixture carries, and the producer's own message type
+/// round-trips a fixture without losing or renaming the field.
+#[test]
+fn test_contract_data_fixtures_carry_dump_version_matching_extraction_complete() {
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("contracts/catalog-events/v1/fixtures");
+    let read = |name: &str| -> serde_json::Value { serde_json::from_str(&std::fs::read_to_string(fixtures.join(name)).unwrap()).unwrap() };
+
+    let version = read("extraction-complete.json")["version"].as_str().unwrap().to_string();
+    for entity in ["artists", "labels", "release-groups", "releases"] {
+        let fixture = read(&format!("musicbrainz-{entity}.data.json"));
+        assert_eq!(fixture["dump_version"], version.as_str(), "{entity} fixture dump_version");
+
+        let message: DataMessage = serde_json::from_value(fixture.clone()).unwrap();
+        assert_eq!(message.dump_version, version);
+        let wire = serde_json::to_value(Message::Data(message)).unwrap();
+        assert_eq!(wire["dump_version"], version.as_str(), "{entity} round trip");
+    }
 }

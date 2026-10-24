@@ -10,7 +10,7 @@
   },
   "contract": "groovemap.catalog-events",
   "event_schema": "schemas/event.schema.json",
-  "event_schema_sha256": "e89b24364448dd0496f96d1dc8b8d46198e358ac12dbd48d250dd6ef7f2967f0",
+  "event_schema_sha256": "5e819b4142e9456219cf8aeda752310dc4ec16b40649b025b5d9297ef779f398",
   "exchange": {
     "kind": "fanout",
     "name_template": "{exchange_prefix}-{entity}"

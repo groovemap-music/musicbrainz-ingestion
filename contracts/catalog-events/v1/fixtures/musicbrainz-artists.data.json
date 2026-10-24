@@ -1,4 +1,5 @@
 {
+  "dump_version": "contract-fixture",
   "id": "contract-musicbrainz-artists",
   "mb_type": "Person",
   "name": "Contract Artist",

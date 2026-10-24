@@ -55,7 +55,13 @@ async fn test_message_batcher_single_message() {
     };
 
     // Send one message
-    let message = DataMessage { id: "1".to_string(), sha256: "hash1".to_string(), data: json!({"name": "Test Artist"}), raw_xml: None };
+    let message = DataMessage {
+        id: "1".to_string(),
+        sha256: "hash1".to_string(),
+        data: json!({"name": "Test Artist"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
     tx.send(message).await.unwrap();
     drop(tx);
 
@@ -90,7 +96,13 @@ async fn test_message_batcher_multiple_batches() {
 
     // Send 7 messages (should create 2 full batches + 1 partial)
     for i in 1..=7 {
-        let message = DataMessage { id: i.to_string(), sha256: format!("hash{}", i), data: json!({"name": format!("Artist {}", i)}), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("hash{}", i),
+            data: json!({"name": format!("Artist {}", i)}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         tx.send(message).await.unwrap();
     }
     drop(tx);
@@ -133,7 +145,13 @@ async fn test_message_batcher_saves_final_state_marker() {
 
     // Send 5 messages
     for i in 1..=5 {
-        let message = DataMessage { id: i.to_string(), sha256: format!("hash{}", i), data: json!({"name": format!("Artist {}", i)}), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("hash{}", i),
+            data: json!({"name": format!("Artist {}", i)}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         tx.send(message).await.unwrap();
     }
     drop(tx);
@@ -189,7 +207,13 @@ async fn test_message_batcher_final_batch_increments_total_batches() {
 
     // Send 3 messages (less than batch_size=10, so only a final partial batch)
     for i in 1..=3 {
-        let message = DataMessage { id: i.to_string(), sha256: format!("hash{}", i), data: json!({"name": format!("Artist {}", i)}), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("hash{}", i),
+            data: json!({"name": format!("Artist {}", i)}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         tx.send(message).await.unwrap();
     }
     drop(tx);
@@ -234,7 +258,13 @@ async fn test_message_batcher_saves_marker_on_read_only_path_warns() {
     };
 
     // Send one message so the batcher has work to do
-    let message = DataMessage { id: "1".to_string(), sha256: "hash1".to_string(), data: json!({"name": "Test"}), raw_xml: None };
+    let message = DataMessage {
+        id: "1".to_string(),
+        sha256: "hash1".to_string(),
+        data: json!({"name": "Test"}),
+        dump_version: "20260101".to_string(),
+        raw_xml: None,
+    };
     tx.send(message).await.unwrap();
     drop(tx);
 
@@ -274,7 +304,13 @@ async fn test_message_batcher_periodic_state_save() {
 
     // Send 15 messages — should trigger periodic save at record 10
     for i in 1..=15 {
-        let message = DataMessage { id: i.to_string(), sha256: format!("hash{}", i), data: json!({"name": format!("Artist {}", i)}), raw_xml: None };
+        let message = DataMessage {
+            id: i.to_string(),
+            sha256: format!("hash{}", i),
+            data: json!({"name": format!("Artist {}", i)}),
+            dump_version: "20260101".to_string(),
+            raw_xml: None,
+        };
         tx.send(message).await.unwrap();
     }
     drop(tx);
