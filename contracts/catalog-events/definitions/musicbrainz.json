@@ -3,6 +3,7 @@
     "brainzgraphinator",
     "brainztableinator"
   ],
+  "fixture_dump_version": "contract-fixture",
   "fixture_payloads": {
     "artists": {
       "mb_type": "Person",

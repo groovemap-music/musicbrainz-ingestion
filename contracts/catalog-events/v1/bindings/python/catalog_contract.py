@@ -5,6 +5,7 @@ from os import getenv
 CONTRACT_NAME = "groovemap.catalog-events"
 CONTRACT_VERSION = 1
 SOURCE = "musicbrainz"
+DUMP_VERSION_FIELD = "dump_version"
 AMQP_EXCHANGE_TYPE = "fanout"
 ENTITY_TYPES = ["artists", "labels", "release-groups", "releases"]
 CONSUMERS = ["brainzgraphinator", "brainztableinator"]

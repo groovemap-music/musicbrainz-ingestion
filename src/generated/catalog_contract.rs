@@ -3,6 +3,7 @@
 pub const CONTRACT_NAME: &str = "groovemap.catalog-events";
 pub const CONTRACT_VERSION: u32 = 1;
 pub const SOURCE: &str = "musicbrainz";
+pub const DUMP_VERSION_FIELD: &str = "dump_version";
 pub const AMQP_EXCHANGE_TYPE: &str = "fanout";
 pub const EXCHANGE_PREFIX_ENV: &str = "MUSICBRAINZ_EXCHANGE_PREFIX";
 pub const DEFAULT_EXCHANGE_PREFIX: &str = "groovemap-musicbrainz";
