@@ -45,7 +45,7 @@ pub async fn run_musicbrainz_loop(
 
     // `process_musicbrainz_data` returns Ok(false) for BOTH a real failure and a between-files
     // shutdown; only this initial path promoted Ok(false) to Err. Short-circuit shutdown to Ok(())
-    // so an operator-requested SIGTERM does not trigger the 600s failure cooldown + exit(1). (cu2.45)
+    // so an operator-requested SIGTERM does not trigger the 600s failure cooldown + exit(1).
     initial_run_outcome(success, shutdown_flag.load(Ordering::SeqCst), "MusicBrainz")?;
 
     info!("✅ Initial MusicBrainz processing completed successfully");
@@ -83,7 +83,7 @@ pub async fn run_musicbrainz_loop(
                     }
                     Err(e) => {
                         error!("❌ Periodic MusicBrainz check failed: {}", e);
-                        reset_status_after_failed_check(&state).await; // (cu2.41)
+                        reset_status_after_failed_check(&state).await;
                     }
                 }
             }
@@ -95,7 +95,7 @@ pub async fn run_musicbrainz_loop(
                     Ok(false) => error!("❌ Triggered MusicBrainz extraction completed with errors"),
                     Err(e) => {
                         error!("❌ Triggered MusicBrainz extraction failed: {}", e);
-                        reset_status_after_failed_check(&state).await; // (cu2.41)
+                        reset_status_after_failed_check(&state).await;
                     }
                 }
             }
@@ -221,7 +221,7 @@ pub async fn process_musicbrainz_data(
 
         // Rehydrate the per-run progress counters from the persisted per-file progress so the
         // /health endpoint reports true totals for types already completed before the crash.
-        // MB dump filenames don't parse via extract_data_type, so map through dump_files. (cu2.92)
+        // MB dump filenames don't parse via extract_data_type, so map through dump_files.
         {
             let mut s = state.write().await;
             for (dt, path) in &dump_files {
@@ -278,7 +278,7 @@ pub async fn process_musicbrainz_data(
                 telemetry::record_file_outcome(telemetry::FileOutcome::Skipped);
                 // Still report the persisted count so a resumed run's extraction_complete
                 // carries true totals for types completed in an earlier session. Without this
-                // the skipped type's key is omitted from the message entirely. (cu2.92)
+                // the skipped type's key is omitted from the message entirely.
                 record_counts.insert(data_type.to_string(), status.records_extracted);
                 continue;
             }

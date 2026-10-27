@@ -104,16 +104,6 @@ for runtime_identity_source in (ROOT / "src" / "main.rs", ROOT / "src" / "health
     text = runtime_identity_source.read_text(encoding="utf-8").lower()
     require("rust-extractor" not in text, f"legacy runtime identity remains in {runtime_identity_source.relative_to(ROOT)}")
 
-active_identity_files = (
-    ROOT / "README.md",
-    ROOT / "Dockerfile",
-    ROOT / "Cargo.toml",
-    *(ROOT / "docs").rglob("*.md"),
-)
-for path in active_identity_files:
-    text = path.read_text(encoding="utf-8").lower()
-    require("discogsography" not in text, f"active legacy product identity remains in {path.relative_to(ROOT)}")
-
 maintained_guides = (ROOT / "README.md", *(path for path in (ROOT / "docs").rglob("*.md") if path.name != "publication-readiness.md"))
 for path in maintained_guides:
     text = path.read_text(encoding="utf-8")

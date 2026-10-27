@@ -54,22 +54,29 @@ the event. Release events additionally include:
   the dump's raw `label-info`; an entry without a catalogue number is dropped;
 - `media_raw`, a source-order copy of MusicBrainz medium metadata without track arrays;
 - `media`, the canonical block mapped with the vendored
-  [`media-taxonomy.json`](../contracts/catalog-events/vocab/media-taxonomy.json).
+  [`media-taxonomy.json`](../contracts/catalog-events/vocab/media-taxonomy.json);
+- `identifiers`, the canonical identifier block mapped from the release's `barcode` and
+  each `label-info` catalogue number with the vendored
+  [`identifier-types.json`](../contracts/catalog-events/vocab/identifier-types.json): the
+  source-order `items`, the sorted `types` and `aliases` the release mints, and
+  `unmapped.types`.
 
 A release without a country, release events, or catalogue numbers still emits `country`
-as `null` and `release_events`/`catalog_numbers` as empty arrays — never a missing key —
-and all three are computed before the content hash, so a change to any of them changes
-`sha256`.
+as `null` and `release_events`/`catalog_numbers` as empty arrays, and every release
+carries an `identifiers` block — never a missing key. All four are computed before the
+content hash, so a change to any of them changes `sha256`.
 
 Every data event, of every entity kind, also carries `dump_version`: the dump version the
 record was extracted from, the same value this extraction's `extraction_complete` carries
 as `version`. It is set by the parser from the version the run resolved at download time and
 is not part of the `sha256` content hash.
 
-Unknown vocabulary values remain under `media.unmapped`. The mapping implementation is
-`src/musicbrainz/media.rs`, and its conformance fixtures are under
-`src/musicbrainz/tests/fixtures/media/`. See the [catalog event contract](../contracts/catalog-events/README.md)
-for the generated event schema and fixture rules.
+Unknown vocabulary values remain under `media.unmapped`. The mapping implementations are
+`src/musicbrainz/media.rs` and `src/musicbrainz/identifiers.rs`, and their conformance
+fixtures are under `src/musicbrainz/tests/fixtures/media/` and
+`src/musicbrainz/tests/fixtures/identifiers/`. See the [catalog event
+contract](../contracts/catalog-events/README.md) for the generated event schema and
+fixture rules.
 
 ## Publication and HTTP control
 
