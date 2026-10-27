@@ -1051,12 +1051,12 @@ async fn test_download_latest_sha256sums_non_success_returns_error() {
     assert!(msg.contains("404") || msg.contains("MusicBrainz SHA256SUMS returned"), "unexpected error: {}", msg);
 }
 
-// ── cu2.15: atomic tmp+rename so a crash never leaves a truncated final file ──────
+// ── Atomic tmp+rename so a crash never leaves a truncated final file ──────
 
 /// A crash mid-extraction leaves a `{entity}.jsonl.xz.tmp`, NOT a truncated
 /// `{entity}.jsonl.xz`. is_version_complete keys on the final name only, so the
 /// partial `.tmp` is correctly treated as incomplete and the version is re-downloaded
-/// instead of being trusted forever. Regression for discogsography-cu2.15.
+/// instead of being trusted forever.
 #[test]
 fn test_is_version_complete_ignores_partial_tmp_file() {
     let dir = TempDir::new().unwrap();
@@ -1231,7 +1231,7 @@ fn build_entity_tarball(entity: &str) -> Vec<u8> {
 
 #[tokio::test]
 async fn test_download_latest_resumes_per_entity() {
-    // discogsography-ov20 regression: a run that died partway through the entity loop must
+    // Regression: a run that died partway through the entity loop must
     // not re-download and re-extract the entities it already materialized. Only `release`
     // is missing here, so only `release.tar.xz` may be fetched.
     let dir = TempDir::new().unwrap();
@@ -1308,7 +1308,7 @@ fn test_sync_parent_dir_missing_parent_is_best_effort() {
 
 #[test]
 fn test_extract_entity_from_tarball_output_is_durable() {
-    // discogsography-ug9f regression: the output must be fsynced before it is renamed into
+    // Regression: the output must be fsynced before it is renamed into
     // place, so a power loss cannot leave a truncated file at the final path that
     // is_version_complete then trusts forever. The observable surface is that the published
     // file is complete and decompresses fully.

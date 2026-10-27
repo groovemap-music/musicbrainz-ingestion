@@ -1,7 +1,7 @@
 # Repository instructions
 
 - Preserve `musicbrainz-ingestion` as the owner of catalog event schemas, generated bindings,
-  fixtures, extraction rules, and producer behavior.
+  fixtures, and producer behavior.
 - Run `just check` before proposing changes. Run the separate `just audit`, `just image`,
   and `just release-dry-run` gates when dependency, image, or release behavior changes.
 - Regenerate contracts with `just contract`; never edit generated bindings directly or

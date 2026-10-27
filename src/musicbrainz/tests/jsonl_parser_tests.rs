@@ -1060,11 +1060,10 @@ fn test_parse_mb_jsonl_file_receiver_dropped() {
 
 // ─── truncated/corrupt .jsonl.xz: read errors must be fatal, not busy-loop ──────
 //
-// Regression for discogsography-cu2.14 (parse_mb_jsonl_file) and
-// discogsography-cu2.46 (build_mbid_discogs_map_from_file). A corrupt or truncated
-// xz stream makes XzDecoder return the *same* io::Error on every subsequent read;
-// the old `continue` arm spun forever at 100% CPU. Both functions must instead
-// surface the error. Each test runs the call on a worker thread and asserts it
+// Regression for parse_mb_jsonl_file and build_mbid_discogs_map_from_file. A
+// corrupt or truncated xz stream makes XzDecoder return the *same* io::Error on
+// every subsequent read; the old `continue` arm spun forever at 100% CPU. Both
+// functions must instead surface the error. Each test runs the call on a worker thread and asserts it
 // TERMINATES within a timeout — a reintroduced busy-loop would never return and
 // fail the recv_timeout rather than hanging CI indefinitely.
 

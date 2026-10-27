@@ -279,7 +279,7 @@ pub(crate) async fn wait_for_trigger(trigger: &Arc<tokio::sync::Mutex<Option<boo
 /// wedging the manual `/trigger` recovery (health.rs returns 409 `already_running` before enqueuing
 /// the trigger) and misreporting `/health`. `Failed` is a terminal, non-`Running` state that
 /// the periodic loop preserves (it only rewrites `Completed` -> `Waiting`) until the next successful
-/// run. (cu2.41)
+/// run.
 pub(crate) async fn reset_status_after_failed_check(state: &Arc<RwLock<ExtractorState>>) {
     let mut s = state.write().await;
     s.extraction_status = ExtractionStatus::Failed;

@@ -55,19 +55,29 @@ so the two cannot drift apart. See `docs/extraction.md` for the producer-side ma
 
 ## Release identifier fields
 
-`releases` events also carry three catalog-identifier fields, additive within contract
-v1 (catalog-identifiers program, wave 1, ADR 0011):
+`releases` events also carry four catalog-identifier fields, additive within contract
+v1 (catalog-identifiers program, wave 1, [ADR 0011, "Catalog identifiers, manufacturing
+credits, and release country"][adr-0011]):
 
 - `country`: the release's ISO country code from the dump, or `null` when absent.
 - `release_events`: `[{date, area_name, area_mbid}]` from the dump's raw
   `release-events`; an entry with neither a date nor an area is dropped.
 - `catalog_numbers`: `[{catalog_number, label_mbid, label_name}]` from the dump's raw
   `label-info`; an entry without a catalogue number is dropped.
+- `identifiers`: the canonical identifier block, mapped from the release's `barcode` and
+  each `label-info` catalogue number against the vendored identifier vocabulary (see
+  "Vendored identifier vocabulary" below). It carries the source-order `items` (canonical
+  `type`, the value as received, and the `source.field` it came from), the sorted `types`
+  and `aliases` the release mints, and `unmapped.types`. A release with neither a
+  barcode nor a catalogue number still carries the block, with empty lists.
 
-These carry the whitelisted release-events and label-info fields verbatim; they do not
-surface manufacturing relations, which stay in the generic `relations` array. See
-`definitions/musicbrainz.json`'s `fixture_payloads.releases` for a worked example and
-`docs/extraction.md` for the producer-side mapping.
+`country`, `release_events`, and `catalog_numbers` carry the whitelisted release-events
+and label-info fields verbatim; none of the four surfaces manufacturing relations, which
+stay in the generic `relations` array. See `definitions/musicbrainz.json`'s
+`fixture_payloads.releases` for a worked example, `docs/extraction.md` for the
+producer-side mapping, and `src/musicbrainz/identifiers.rs` for the identifier mapper.
+
+[adr-0011]: https://github.com/groovemap-music/design/blob/main/docs/adr/0011-catalog-identifiers-and-manufacturing-credits.md
 
 ## Vendored media taxonomy
 
@@ -114,3 +124,17 @@ longer matches `vocab/source.json`. `just contract` never writes or rewrites eit
 
 Never write an absolute host path into `source.json` or any tracked file -- only the
 commit sha, the design-repo-relative path, and the digest.
+
+## Vendored identifier vocabulary
+
+`vocab/identifier-types.json`, `vocab/identifier-types.schema.json`, and
+`vocab/identifier-block.schema.json` are likewise **not generated**: they are copied byte
+for byte from the `design` repository's `taxonomy/identifiers/v1/` ([ADR 0011][adr-0011]).
+`src/musicbrainz/identifiers.rs` compiles in `identifier-types.json`. Their source record
+is `vocab/identifiers-source.json`, which names one design commit plus each file's
+design-repo-relative path and SHA-256 digest.
+
+`just contract-check` fails if a recorded file's digest no longer matches, or if the
+recorded commit differs from the reviewed design commit pinned in `contracts/generate.py`.
+A re-vendor therefore follows the steps above for each file, updates its entry and the
+shared commit in `vocab/identifiers-source.json`, and moves that pin in the same change.
