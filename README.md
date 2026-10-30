@@ -19,6 +19,49 @@ The service publishes artists, labels, release groups, and releases. It is an
 independent runtime: it does not poll Discogs health, acquire a cross-container lock,
 or wait for Discogs ingestion. The two provider containers may ingest concurrently.
 
+## Quick start
+
+The service is for operators who run the MusicBrainz producer and developers who change
+it. It needs a reachable RabbitMQ broker and a writable data directory.
+
+```bash
+just image
+docker run --rm -p 8000:8000 \
+  -e RABBITMQ_HOST=host.docker.internal \
+  -v musicbrainz-data:/musicbrainz-data \
+  musicbrainz-ingestion:local
+curl http://localhost:8000/health
+```
+
+The service checks for a newer MusicBrainz dump when it starts and then every
+`PERIODIC_CHECK_DAYS` days. Use `POST /trigger` to start a run on demand. To change the
+code, see [Development](#development).
+
+## Configuration
+
+All settings are environment variables; the service reads no configuration file. Unparsable
+numbers fall back to the default.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `RABBITMQ_HOST` / `RABBITMQ_PORT` | `rabbitmq` / `5672` | Broker address. |
+| `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | `groovemap` / `groovemap` | Broker credentials. Set `<VAR>_FILE` to read the value from a file (for secrets). |
+| `MUSICBRAINZ_ROOT` | `/musicbrainz-data` | Where dumps and state markers are stored. |
+| `MUSICBRAINZ_DUMP_URL` | MetaBrainz JSON dump index | Source of dumps. |
+| `MUSICBRAINZ_EXCHANGE_PREFIX` | `groovemap-musicbrainz` | Prefix of the RabbitMQ exchange names. |
+| `PERIODIC_CHECK_DAYS` | `15` | Days between checks for a new dump. |
+| `FORCE_REPROCESS` | `false` | Reprocess the selected version (same as `--force-reprocess`). |
+| `HEALTH_PORT` | `8000` | Port of the HTTP control server. |
+| `MAX_WORKERS` | CPU count | Worker threads. |
+| `BATCH_SIZE` | `100` | Records per AMQP batch. |
+| `QUEUE_SIZE` | `5000` | Internal queue size. |
+| `PROGRESS_LOG_INTERVAL` | `1000` | Records between progress log lines. |
+| `STATE_SAVE_INTERVAL` | `5000` | Records between state-marker checkpoints. |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `ENVIRONMENT` | `development` | Value of the `environment` log field; see below. |
+
+For what each setting does during a run, see [Extraction](docs/extraction.md).
+
 ## Structured logging
 
 Every JSON log event includes a root `environment` string, read once from `ENVIRONMENT`
