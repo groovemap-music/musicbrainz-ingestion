@@ -37,8 +37,16 @@ curl http://localhost:8000/health
 `RABBITMQ_HOST` defaults to `rabbitmq`, a Compose service name, so the command above
 overrides it to reach a broker on your machine. (`--add-host` makes
 `host.docker.internal` resolve on Linux; Docker Desktop already provides it.) The default
-credentials are `groovemap` / `groovemap`; a stock broker that only has the `guest` user
-needs `-e RABBITMQ_USERNAME=guest -e RABBITMQ_PASSWORD=guest`.
+credentials are `groovemap` / `groovemap`. RabbitMQ's built-in `guest` user only accepts
+loopback connections, so a container cannot use it. On a stock broker, create a matching
+user first:
+
+```bash
+rabbitmqctl add_user groovemap groovemap
+rabbitmqctl set_permissions -p / groovemap ".*" ".*" ".*"
+```
+
+Or use different credentials and pass them as `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`.
 
 The service checks for a newer MusicBrainz dump when it starts and then every
 `PERIODIC_CHECK_DAYS` days. Use `POST /trigger` to start a run on demand. To change the
