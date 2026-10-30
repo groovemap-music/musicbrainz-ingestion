@@ -27,11 +27,18 @@ it. It needs a reachable RabbitMQ broker and a writable data directory.
 ```bash
 just image
 docker run --rm -p 8000:8000 \
+  --add-host=host.docker.internal:host-gateway \
   -e RABBITMQ_HOST=host.docker.internal \
   -v musicbrainz-data:/musicbrainz-data \
   musicbrainz-ingestion:local
 curl http://localhost:8000/health
 ```
+
+`RABBITMQ_HOST` defaults to `rabbitmq`, a Compose service name, so the command above
+overrides it to reach a broker on your machine. (`--add-host` makes
+`host.docker.internal` resolve on Linux; Docker Desktop already provides it.) The default
+credentials are `groovemap` / `groovemap`; a stock broker that only has the `guest` user
+needs `-e RABBITMQ_USERNAME=guest -e RABBITMQ_PASSWORD=guest`.
 
 The service checks for a newer MusicBrainz dump when it starts and then every
 `PERIODIC_CHECK_DAYS` days. Use `POST /trigger` to start a run on demand. To change the
@@ -57,10 +64,13 @@ numbers fall back to the default.
 | `QUEUE_SIZE` | `5000` | Internal queue size. |
 | `PROGRESS_LOG_INTERVAL` | `1000` | Records between progress log lines. |
 | `STATE_SAVE_INTERVAL` | `5000` | Records between state-marker checkpoints. |
-| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `LOG_LEVEL` | `INFO` | Case-insensitive `DEBUG`, `INFO`, `WARNING` (or `WARN`), `ERROR`, `CRITICAL`. `CRITICAL` behaves like `ERROR`; unknown values fall back to `INFO`. |
+| `FAILURE_COOLDOWN_SECS` | `600` | Seconds to sleep before exiting after a failed run, to avoid restart loops; `0` disables. |
 | `ENVIRONMENT` | `development` | Value of the `environment` log field; see below. |
 
-For what each setting does during a run, see [Extraction](docs/extraction.md).
+This table covers the core settings. Telemetry uses the standard `OTEL_*` variables listed under
+[Telemetry](#telemetry). For what each setting does during a run, see
+[Extraction](docs/extraction.md).
 
 ## Structured logging
 
