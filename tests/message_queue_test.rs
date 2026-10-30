@@ -174,7 +174,6 @@ fn test_data_message_flattened_data() {
 fn test_data_type_display() {
     assert_eq!(DataType::Artists.to_string(), "artists");
     assert_eq!(DataType::Labels.to_string(), "labels");
-    assert_eq!(DataType::Masters.to_string(), "masters");
     assert_eq!(DataType::Releases.to_string(), "releases");
 }
 
@@ -182,7 +181,6 @@ fn test_data_type_display() {
 fn test_data_type_as_str() {
     assert_eq!(DataType::Artists.as_str(), "artists");
     assert_eq!(DataType::Labels.as_str(), "labels");
-    assert_eq!(DataType::Masters.as_str(), "masters");
     assert_eq!(DataType::Releases.as_str(), "releases");
 }
 
@@ -192,7 +190,6 @@ fn test_data_type_from_str() {
 
     assert_eq!(DataType::from_str("artists").unwrap(), DataType::Artists);
     assert_eq!(DataType::from_str("labels").unwrap(), DataType::Labels);
-    assert_eq!(DataType::from_str("masters").unwrap(), DataType::Masters);
     assert_eq!(DataType::from_str("releases").unwrap(), DataType::Releases);
 
     // Test invalid data type
@@ -318,7 +315,6 @@ fn test_message_batch_serialization() {
 fn test_data_type_equality() {
     assert_eq!(DataType::Artists, DataType::Artists);
     assert_ne!(DataType::Artists, DataType::Labels);
-    assert_ne!(DataType::Masters, DataType::Releases);
 }
 
 #[test]

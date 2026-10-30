@@ -678,3 +678,17 @@ async fn test_repeated_saves_overwrite_the_marker_in_place() {
     assert_eq!(loaded.summary.overall_status, PhaseStatus::Completed);
     assert!(!path.with_extension("json.tmp").exists());
 }
+
+#[test]
+fn test_summary_with_legacy_masters_key_still_loads() {
+    // Markers written before Masters was dropped carry a "masters" entry in files_by_type.
+    let legacy = r#"{
+        "overall_status": "completed",
+        "total_duration_seconds": 12.5,
+        "files_by_type": {"artists": "completed", "masters": "pending", "releases": "completed"}
+    }"#;
+    let summary: ExtractionSummary = serde_json::from_str(legacy).unwrap();
+    assert_eq!(summary.overall_status, PhaseStatus::Completed);
+    assert_eq!(summary.files_by_type.len(), 3);
+    assert_eq!(summary.files_by_type["artists"], PhaseStatus::Completed);
+}

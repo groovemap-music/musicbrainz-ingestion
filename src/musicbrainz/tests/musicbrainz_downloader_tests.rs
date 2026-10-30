@@ -708,12 +708,6 @@ fn test_parse_sha256sums_blank_lines() {
 // ── entity_keyword coverage ─────────────────────────────────────────────
 
 #[test]
-fn test_entity_keyword_masters() {
-    // entity_keyword handles DataType::Masters
-    assert_eq!(entity_keyword(DataType::Masters), "master");
-}
-
-#[test]
 fn test_entity_keyword_release_groups() {
     assert_eq!(entity_keyword(DataType::ReleaseGroups), "release-group");
 }

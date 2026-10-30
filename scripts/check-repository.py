@@ -158,10 +158,9 @@ for relative_path, forbidden_markers in boundary_sources.items():
 types_source = (ROOT / "src" / "types.rs").read_text(encoding="utf-8")
 health_source = (ROOT / "src" / "health.rs").read_text(encoding="utf-8")
 state_marker_source = (ROOT / "src" / "state_marker.rs").read_text(encoding="utf-8")
-require("DataType::Masters" in types_source, "retained masters compatibility variant is missing")
-require("pub masters: u64" in types_source, "retained masters progress field is missing")
-require('"masters"' in health_source, "health compatibility must retain the masters field")
-require('"extraction_progress_masters"' in health_source, "metrics compatibility must retain the masters field")
+require("DataType::Masters" not in types_source, "Discogs-only Masters variant must not return to the MusicBrainz extractor")
+require("masters" not in types_source, "Discogs-only masters progress field must not return to the MusicBrainz extractor")
+require("masters" not in health_source, "health and metrics must not expose the Discogs-only masters field")
 require("musicbrainz_file_path" in state_marker_source, "MusicBrainz state-marker path helper is missing")
 
 contract_path = ROOT / "contracts" / "catalog-events" / "v1" / "contract.json"

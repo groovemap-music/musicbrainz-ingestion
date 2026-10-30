@@ -12,7 +12,6 @@ async fn test_extractor_state_initialization() {
 
     assert_eq!(state.extraction_progress.artists, 0);
     assert_eq!(state.extraction_progress.labels, 0);
-    assert_eq!(state.extraction_progress.masters, 0);
     assert_eq!(state.extraction_progress.releases, 0);
     assert_eq!(state.error_count, 0);
     assert!(state.completed_files.is_empty());
@@ -80,7 +79,6 @@ async fn test_extractor_state_last_extraction_time() {
     let s = state.read().await;
     assert!(s.last_extraction_time.contains_key(&DataType::Artists));
     assert!(s.last_extraction_time.contains_key(&DataType::Labels));
-    assert!(!s.last_extraction_time.contains_key(&DataType::Masters));
 }
 
 #[tokio::test]
@@ -91,12 +89,11 @@ async fn test_extractor_state_progress_increment() {
         let mut s = state.write().await;
         s.extraction_progress.artists = 100;
         s.extraction_progress.labels = 50;
-        s.extraction_progress.masters = 75;
         s.extraction_progress.releases = 200;
     }
 
     let s = state.read().await;
-    assert_eq!(s.extraction_progress.total(), 425);
+    assert_eq!(s.extraction_progress.total(), 350);
 }
 
 #[tokio::test]
@@ -178,12 +175,11 @@ async fn test_extractor_state_large_scale_updates() {
         // Simulate processing large datasets
         s.extraction_progress.artists = 1_000_000;
         s.extraction_progress.labels = 500_000;
-        s.extraction_progress.masters = 750_000;
         s.extraction_progress.releases = 2_000_000;
     }
 
     let s = state.read().await;
-    assert_eq!(s.extraction_progress.total(), 4_250_000);
+    assert_eq!(s.extraction_progress.total(), 3_500_000);
 }
 
 #[tokio::test]
@@ -215,12 +211,11 @@ async fn test_state_progress_tracking_accuracy() {
         let mut s = state.write().await;
         s.extraction_progress.artists = 1234;
         s.extraction_progress.labels = 5678;
-        s.extraction_progress.masters = 9012;
         s.extraction_progress.releases = 3456;
     }
 
     let s = state.read().await;
-    let expected_total = 1234 + 5678 + 9012 + 3456;
+    let expected_total = 1234 + 5678 + 3456;
     assert_eq!(s.extraction_progress.total(), expected_total);
 }
 
@@ -228,7 +223,7 @@ async fn test_state_progress_tracking_accuracy() {
 async fn test_extractor_state_concurrent_file_tracking() {
     let state = Arc::new(RwLock::new(ExtractorState::default()));
 
-    let files = vec!["artists.xml", "labels.xml", "masters.xml", "releases.xml"];
+    let files = vec!["artists.xml", "labels.xml", "releases.xml"];
     let handles: Vec<_> = files
         .into_iter()
         .map(|file| {
@@ -246,7 +241,7 @@ async fn test_extractor_state_concurrent_file_tracking() {
     }
 
     let s = state.read().await;
-    assert_eq!(s.completed_files.len(), 4);
+    assert_eq!(s.completed_files.len(), 3);
 }
 
 #[tokio::test]
