@@ -26,7 +26,6 @@ fn entity_keyword(dt: DataType) -> &'static str {
         DataType::Labels => "label",
         DataType::ReleaseGroups => "release-group",
         DataType::Releases => "release",
-        DataType::Masters => "master",
     }
 }
 

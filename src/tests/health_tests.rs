@@ -98,7 +98,6 @@ async fn test_metrics_handler_with_data() {
         let mut s = state.write().await;
         s.extraction_progress.artists = 1000;
         s.extraction_progress.labels = 500;
-        s.extraction_progress.masters = 300;
         s.extraction_progress.releases = 2000;
         s.completed_files.insert("file1.xml".to_string());
         s.completed_files.insert("file2.xml".to_string());
@@ -114,9 +113,8 @@ async fn test_metrics_handler_with_data() {
     let value = json.0;
     assert_eq!(value["extraction_progress_artists"], 1000);
     assert_eq!(value["extraction_progress_labels"], 500);
-    assert_eq!(value["extraction_progress_masters"], 300);
     assert_eq!(value["extraction_progress_releases"], 2000);
-    assert_eq!(value["extraction_progress_total"], 3800);
+    assert_eq!(value["extraction_progress_total"], 3500);
     assert_eq!(value["completed_files"], 2);
     assert_eq!(value["active_connections"], 1);
     assert_eq!(value["error_count"], 5);
@@ -155,7 +153,6 @@ async fn test_health_json_format() {
     let extraction = &value["extraction_progress"];
     assert!(extraction.get("artists").is_some());
     assert!(extraction.get("labels").is_some());
-    assert!(extraction.get("masters").is_some());
     assert!(extraction.get("releases").is_some());
     assert!(extraction.get("total").is_some());
 }
@@ -234,7 +231,6 @@ async fn test_metrics_json_format() {
     // Verify all required metrics are present
     assert!(value.get("extraction_progress_artists").is_some());
     assert!(value.get("extraction_progress_labels").is_some());
-    assert!(value.get("extraction_progress_masters").is_some());
     assert!(value.get("extraction_progress_release_groups").is_some());
     assert!(value.get("extraction_progress_releases").is_some());
     assert!(value.get("extraction_progress_total").is_some());
@@ -346,7 +342,7 @@ async fn test_metrics_parts_sum_to_published_total() {
     assert_eq!(value["extraction_progress_release_groups"], 700);
     assert_eq!(value["extraction_progress_total"], 4200);
 
-    let parts: u64 = ["artists", "labels", "masters", "release_groups", "releases"]
+    let parts: u64 = ["artists", "labels", "release_groups", "releases"]
         .iter()
         .map(|t| value[format!("extraction_progress_{t}")].as_u64().unwrap_or_else(|| panic!("missing extraction_progress_{t}")))
         .sum();
@@ -362,8 +358,20 @@ async fn test_metrics_and_health_report_same_types() {
     let (_, metrics_json) = metrics_handler(State((state, trigger))).await;
 
     let health_progress = health_json.0["extraction_progress"].clone();
-    for data_type in ["artists", "labels", "masters", "release_groups", "releases", "total"] {
+    for data_type in ["artists", "labels", "release_groups", "releases", "total"] {
         assert!(health_progress.get(data_type).is_some(), "/health is missing {data_type}");
         assert!(metrics_json.0.get(format!("extraction_progress_{data_type}")).is_some(), "/metrics is missing {data_type}");
     }
+}
+
+#[tokio::test]
+async fn test_health_and_metrics_do_not_expose_masters() {
+    let state = Arc::new(RwLock::new(ExtractorState::default()));
+    let trigger = Arc::new(Mutex::new(None::<bool>));
+    let (_, health_json) = health_handler(State((state.clone(), trigger.clone()))).await;
+    let (_, metrics_json) = metrics_handler(State((state, trigger))).await;
+
+    assert!(health_json.0["extraction_progress"].get("masters").is_none());
+    assert!(health_json.0["last_extraction_time"].get("masters").is_none());
+    assert!(metrics_json.0.get("extraction_progress_masters").is_none());
 }

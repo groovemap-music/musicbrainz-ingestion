@@ -50,11 +50,11 @@ constructor, Discogs HTTP defaults, Discogs marker path, and Discogs filename pa
 `scripts/check-repository.py` prevents those dormant entry points and retired lifecycle
 wording from returning.
 
-### Explicit compatibility exception
+### Masters removed
 
-`DataType::Masters` and `ExtractionProgress.masters` remain even though Masters is not a
-MusicBrainz entity. The zero-valued `masters` member already appears in the serialized
-state, `/health`, and JSON `/metrics` shapes observed by operators. Removing it would
-change those public bytes. Active extraction continues to use `DataType::musicbrainz()`,
-which excludes Masters, and regression tests require the retained field while proving it
-cannot enter the active MusicBrainz entity list.
+`DataType::Masters` and `ExtractionProgress.masters` are gone. Masters is a Discogs entity
+that MusicBrainz extraction never produces, so `/health`, `/metrics`, and the progress log
+report only artists, labels, release groups, and releases. `ExtractionProgress` is never
+persisted, and the state marker keys `files_by_type` by plain string, so markers written by
+older versions (which may carry a `masters` key) still load. `scripts/check-repository.py`
+prevents the field from returning.

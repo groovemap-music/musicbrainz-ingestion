@@ -617,7 +617,6 @@ fn minimal_line(data_type: DataType) -> &'static str {
         DataType::Labels => r#"{"id":"mbid-l","name":"Label","type":"Original Production","relations":[]}"#,
         DataType::ReleaseGroups => r#"{"id":"mbid-rg","title":"Group","primary-type":"Album","relations":[]}"#,
         DataType::Releases => r#"{"id":"mbid-r","title":"Release","status":"Official","relations":[]}"#,
-        DataType::Masters => unreachable!("MusicBrainz has no masters"),
     }
 }
 
@@ -628,7 +627,6 @@ fn parse_minimal(data_type: DataType, dump_version: &str) -> DataMessage {
         DataType::Labels => parse_mb_label_line(line, dump_version),
         DataType::ReleaseGroups => parse_mb_release_group_line(line, dump_version),
         DataType::Releases => parse_mb_release_line(line, dump_version),
-        DataType::Masters => unreachable!("MusicBrainz has no masters"),
     }
     .unwrap()
 }
@@ -737,25 +735,6 @@ fn test_parse_mb_jsonl_file_skips_malformed_lines() {
     assert_eq!(count, 1);
     let msg = rt.block_on(receiver.recv()).unwrap();
     assert_eq!(msg.id, "ok-id");
-}
-
-#[test]
-fn test_parse_mb_jsonl_file_masters_returns_zero() {
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-    use tokio::sync::mpsc;
-    use xz2::write::XzEncoder;
-
-    let mut temp_file = NamedTempFile::new().unwrap();
-    let mut encoder = XzEncoder::new(Vec::new(), 1);
-    encoder.write_all(b"some content\n").unwrap();
-    let compressed = encoder.finish().unwrap();
-    temp_file.write_all(&compressed).unwrap();
-    temp_file.flush().unwrap();
-
-    let (sender, _receiver) = mpsc::channel(10);
-    let count = parse_mb_jsonl_file(temp_file.path(), DataType::Masters, sender, None, TEST_DUMP_VERSION).unwrap();
-    assert_eq!(count, 0);
 }
 
 // ─── build_mbid_discogs_map_from_file ─────────────────────────────────────────

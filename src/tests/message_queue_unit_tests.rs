@@ -43,7 +43,6 @@ fn test_message_serialization_file_complete() {
 fn test_data_type_display() {
     assert_eq!(DataType::Artists.to_string(), "artists");
     assert_eq!(DataType::Labels.to_string(), "labels");
-    assert_eq!(DataType::Masters.to_string(), "masters");
     assert_eq!(DataType::Releases.to_string(), "releases");
 }
 
@@ -147,7 +146,6 @@ fn test_data_type_from_string_all_variants() {
 
     assert!(matches!(DataType::from_str("artists"), Ok(DataType::Artists)));
     assert!(matches!(DataType::from_str("labels"), Ok(DataType::Labels)));
-    assert!(matches!(DataType::from_str("masters"), Ok(DataType::Masters)));
     assert!(matches!(DataType::from_str("releases"), Ok(DataType::Releases)));
     assert!(DataType::from_str("invalid").is_err());
     assert!(DataType::from_str("").is_err());

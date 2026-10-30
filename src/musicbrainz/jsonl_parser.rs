@@ -527,10 +527,6 @@ pub fn parse_mb_jsonl_file(
         DataType::Labels => parse_mb_label_line,
         DataType::Releases => parse_mb_release_line,
         DataType::ReleaseGroups => parse_mb_release_group_line,
-        DataType::Masters => {
-            warn!("⚠️ MusicBrainz does not have a Masters data type; skipping file {:?}", path);
-            return Ok(0);
-        }
     };
 
     let mut count = 0u64;

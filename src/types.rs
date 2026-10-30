@@ -5,15 +5,10 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Entity types represented in MusicBrainz extraction state.
-///
-/// `Masters` is retained only because it is already present in the serialized
-/// progress and health-response shapes. Active MusicBrainz work is selected by
-/// [`DataType::musicbrainz`], which excludes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DataType {
     Artists,
     Labels,
-    Masters,
     ReleaseGroups,
     Releases,
 }
@@ -22,10 +17,10 @@ impl DataType {
     /// Get all data types
     #[allow(dead_code)]
     pub fn all() -> Vec<DataType> {
-        vec![DataType::Artists, DataType::Labels, DataType::Masters, DataType::ReleaseGroups, DataType::Releases]
+        vec![DataType::Artists, DataType::Labels, DataType::ReleaseGroups, DataType::Releases]
     }
 
-    /// Get data types for MusicBrainz extraction (no Masters)
+    /// Get data types for MusicBrainz extraction
     pub fn musicbrainz() -> Vec<DataType> {
         vec![DataType::Artists, DataType::Labels, DataType::ReleaseGroups, DataType::Releases]
     }
@@ -35,7 +30,6 @@ impl DataType {
         match self {
             DataType::Artists => "artists",
             DataType::Labels => "labels",
-            DataType::Masters => "masters",
             DataType::ReleaseGroups => "release-groups",
             DataType::Releases => "releases",
         }
@@ -55,7 +49,6 @@ impl FromStr for DataType {
         match s.to_lowercase().as_str() {
             "artists" => Ok(DataType::Artists),
             "labels" => Ok(DataType::Labels),
-            "masters" => Ok(DataType::Masters),
             "release-groups" => Ok(DataType::ReleaseGroups),
             "releases" => Ok(DataType::Releases),
             _ => Err(format!("Unknown data type: {}", s)),
@@ -68,7 +61,6 @@ impl FromStr for DataType {
 pub struct ExtractionProgress {
     pub artists: u64,
     pub labels: u64,
-    pub masters: u64,
     pub release_groups: u64,
     pub releases: u64,
 }
@@ -78,7 +70,6 @@ impl ExtractionProgress {
         match data_type {
             DataType::Artists => self.artists += 1,
             DataType::Labels => self.labels += 1,
-            DataType::Masters => self.masters += 1,
             DataType::ReleaseGroups => self.release_groups += 1,
             DataType::Releases => self.releases += 1,
         }
@@ -92,7 +83,6 @@ impl ExtractionProgress {
         match data_type {
             DataType::Artists => self.artists += count,
             DataType::Labels => self.labels += count,
-            DataType::Masters => self.masters += count,
             DataType::ReleaseGroups => self.release_groups += count,
             DataType::Releases => self.releases += count,
         }
@@ -103,14 +93,13 @@ impl ExtractionProgress {
         match data_type {
             DataType::Artists => self.artists,
             DataType::Labels => self.labels,
-            DataType::Masters => self.masters,
             DataType::ReleaseGroups => self.release_groups,
             DataType::Releases => self.releases,
         }
     }
 
     pub fn total(&self) -> u64 {
-        self.artists + self.labels + self.masters + self.release_groups + self.releases
+        self.artists + self.labels + self.release_groups + self.releases
     }
 }
 

@@ -25,7 +25,6 @@ async fn test_data_type_conversion() {
 
     assert_eq!(DataType::from_str("artists"), Ok(DataType::Artists));
     assert_eq!(DataType::from_str("labels"), Ok(DataType::Labels));
-    assert_eq!(DataType::from_str("masters"), Ok(DataType::Masters));
     assert_eq!(DataType::from_str("releases"), Ok(DataType::Releases));
     assert!(DataType::from_str("invalid").is_err());
 }

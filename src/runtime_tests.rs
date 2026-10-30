@@ -196,7 +196,7 @@ async fn test_message_batcher_timeout_flush() {
     // Run batcher with large batch size
     let batcher_config = BatcherConfig {
         batch_size: 100,
-        data_type: DataType::Masters,
+        data_type: DataType::Artists,
         state: state.clone(),
         state_marker,
         marker_path,
@@ -494,7 +494,6 @@ async fn test_progress_reporter_with_completed_files_and_active_connections() {
         let mut s = state.write().await;
         s.extraction_progress.artists = 1000;
         s.extraction_progress.labels = 500;
-        s.extraction_progress.masters = 200;
         s.extraction_progress.releases = 300;
         s.completed_files.insert("artist.jsonl.xz".to_string());
         s.active_connections.insert(DataType::Labels, "label.jsonl.xz".to_string());
