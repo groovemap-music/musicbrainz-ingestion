@@ -82,13 +82,29 @@ This table covers the core settings. Telemetry uses the standard `OTEL_*` variab
 
 ## Structured logging
 
-Every JSON log event includes a root `environment` string, read once from `ENVIRONMENT`
-at startup. Unset or non-Unicode values default to `development`; explicit values,
-including an empty string, are preserved. Production Compose must set
-`ENVIRONMENT=production`. This log context is independent of
-`OTEL_RESOURCE_ATTRIBUTES` and cannot be replaced by an event field named `environment`,
-which remains inside `fields`. `LOG_LEVEL` filtering and the existing JSON event/span
-fields remain unchanged.
+Every log line is one JSON object in the shared GrooveMap schema that the Python services
+emit through `common.config.setup_logging`:
+
+```json
+{"environment":"production","event":"extraction started","level":"info","lineno":218,"logger":"extractor::runtime","service":"musicbrainz-ingestion","timestamp":"2026-11-04T16:21:52.984261Z"}
+```
+
+| Key | Value |
+|-----|-------|
+| `timestamp` | RFC 3339 UTC with a `Z` suffix |
+| `level` | lowercase `debug`, `info`, `warning` or `error`; tracing `TRACE` is folded into `debug` and `WARN` becomes `warning` (Rust has no `critical`) |
+| `logger` | the tracing target, i.e. the Rust module path |
+| `lineno` | source line of the event |
+| `event` | the log message |
+| `service` | always `musicbrainz-ingestion` |
+| `environment` | read once from `ENVIRONMENT` at startup; unset or non-Unicode values default to `development`, explicit values (including an empty string) are preserved |
+
+Event fields (`info!(records = 7, "...")`) appear at the root beside those keys. The schema
+keys always win: an event field named `timestamp`, `level`, `logger`, `lineno`, `event`,
+`service`, `environment`, `span`, `spans` or `fields` is kept under a nested `fields` object
+(`fields.environment`) so no value is lost. Span context stays nested as `span` (innermost)
+and `spans` (root to leaf). Production Compose must set `ENVIRONMENT=production`. This
+context is independent of `OTEL_RESOURCE_ATTRIBUTES`, and `LOG_LEVEL` filtering is unchanged.
 
 ## Telemetry
 
