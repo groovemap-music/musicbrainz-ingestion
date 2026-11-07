@@ -589,6 +589,39 @@ pub fn extract_entity_from_tarball(tar_path: &Path, entity: &str, out_path: &Pat
     Ok(())
 }
 
+/// Environment variable that overrides the number of xz encoder threads.
+pub const XZ_THREADS_ENV: &str = "MUSICBRAINZ_XZ_THREADS";
+/// Default (and cap) for the xz encoder thread count when the env override is absent.
+const DEFAULT_XZ_THREADS: u32 = 6;
+/// xz preset for the re-encode. A low preset trades a little output size for a large speedup;
+/// the data is only re-read once by the parser. See the bead measurements for the choice.
+const XZ_PRESET: u32 = 1;
+
+/// Resolve the encoder thread count: `MUSICBRAINZ_XZ_THREADS` if set to a positive integer,
+/// otherwise `min(available cores, 6)`. Never returns 0.
+pub(crate) fn xz_threads() -> u32 {
+    resolve_xz_threads(std::env::var(XZ_THREADS_ENV).ok().as_deref(), std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1))
+}
+
+pub(crate) fn resolve_xz_threads(env_value: Option<&str>, cores: u32) -> u32 {
+    if let Some(n) = env_value.and_then(|v| v.trim().parse::<u32>().ok()).filter(|n| *n > 0) {
+        return n;
+    }
+    cores.clamp(1, DEFAULT_XZ_THREADS)
+}
+
+/// Multi-threaded xz encoder writing one standard multi-block `.xz` stream, readable by the
+/// ordinary single-stream `XzDecoder` the parser uses.
+fn new_mt_encoder(out: std::fs::File, threads: u32) -> Result<xz2::write::XzEncoder<std::fs::File>> {
+    let stream = xz2::stream::MtStreamBuilder::new()
+        .threads(threads)
+        .preset(XZ_PRESET)
+        .check(xz2::stream::Check::Crc64)
+        .encoder()
+        .context("Failed to initialise multi-threaded xz encoder")?;
+    Ok(xz2::write::XzEncoder::new_stream(out, stream))
+}
+
 /// Core extraction: pull a `.tar.xz` byte stream through an XZ decoder, locate
 /// `mbdump/<entity>` inside the tar archive, and re-encode it as `.jsonl.xz` at the given path.
 ///
@@ -600,8 +633,6 @@ pub fn extract_entity_from_tarball(tar_path: &Path, entity: &str, out_path: &Pat
 ///
 /// On failure, the partial output file is removed so a retry can start from a clean slate.
 fn extract_entity_from_reader<R: Read>(reader: R, entity: &str, out_path: &Path) -> Result<R> {
-    use xz2::write::XzEncoder;
-
     let xz = xz2::read::XzDecoder::new(reader);
     let mut archive = tar::Archive::new(xz);
     let target_suffix = format!("mbdump/{}", entity);
@@ -621,7 +652,7 @@ fn extract_entity_from_reader<R: Read>(reader: R, entity: &str, out_path: &Path)
 
         let out_file = std::fs::File::create(out_path) // nosemgrep: rust.actix.path-traversal.tainted-path.tainted-path
             .with_context(|| format!("Failed to create output file: {:?}", out_path))?;
-        let mut encoder = XzEncoder::new(out_file, 6);
+        let mut encoder = new_mt_encoder(out_file, xz_threads())?;
 
         // Stream with progress logging — xz decompression of large files can take 30+ minutes.
         let mut buf = [0u8; 256 * 1024]; // 256 KB buffer
