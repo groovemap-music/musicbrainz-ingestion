@@ -3,6 +3,28 @@
 All notable changes to this repository will be recorded here by Commitizen from
 Conventional Commits.
 
+## v0.4.0 (2026-11-06)
+
+### Release notes
+
+Every data message carries `dump_version`, declared in catalog-events v1. Security advisories are patched.
+
+### Feat
+
+- **parser**: stamp dump_version on every MusicBrainz data message
+- **contracts**: declare dump_version on catalog-events v1 data messages
+
+### Fix
+
+- **logging**: emit the shared GrooveMap JSON log schema
+- **deps**: bump rustls-webpki and webpki-root-certs for RUSTSEC-2026-0382 and RUSTSEC-2026-0383 (gm-musicbrainz-ingestion-xar)
+- **build**: move sccache wrapper out of committed cargo config (#9)
+- **deps**: patch QUIC and TLS security vulnerabilities
+
+### Refactor
+
+- **types**: drop Discogs-only Masters from the MusicBrainz extractor
+
 ## v0.3.0 (2026-10-03)
 
 ### Feat
