@@ -1336,3 +1336,226 @@ fn test_extract_entity_from_tarball_output_is_durable() {
     xz2::read::XzDecoder::new(std::fs::File::open(&out_path).unwrap()).read_to_string(&mut round_tripped).unwrap();
     assert_eq!(round_tripped, payload, "the published file must contain the complete XZ stream");
 }
+
+// ─── multi-threaded xz re-encode ────────────────────────────────────────────
+
+fn artist_lines(count: usize) -> String {
+    // Hex noise keeps the data poorly compressible so the output spans many xz blocks.
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    let mut out = String::new();
+    for i in 0..count {
+        let mut noise = String::new();
+        for _ in 0..8 {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            noise.push_str(&format!("{state:016x}"));
+        }
+        out.push_str(&format!(r#"{{"id":"mbid-{i}","name":"Artist {noise}","sort-name":"Artist {i}","type":"Person","relations":[]}}"#));
+        out.push('\n');
+    }
+    out
+}
+
+fn tar_xz_file(dir: &Path, entity: &str, content: &[u8]) -> PathBuf {
+    let mut tar_data = Vec::new();
+    {
+        let mut builder = tar::Builder::new(&mut tar_data);
+        let mut header = tar::Header::new_gnu();
+        header.set_path(format!("{entity}/mbdump/{entity}")).unwrap();
+        header.set_size(content.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append(&header, content).unwrap();
+        builder.finish().unwrap();
+    }
+    let mut encoder = xz2::write::XzEncoder::new(Vec::new(), 1);
+    encoder.write_all(&tar_data).unwrap();
+    let path = dir.join(format!("{entity}.tar.xz"));
+    std::fs::write(&path, encoder.finish().unwrap()).unwrap();
+    path
+}
+
+fn parse_count(path: &Path) -> u64 {
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1024);
+    let drain = std::thread::spawn(move || {
+        let mut n = 0u64;
+        while receiver.blocking_recv().is_some() {
+            n += 1;
+        }
+        n
+    });
+    let count =
+        crate::musicbrainz::jsonl_parser::parse_mb_jsonl_file(path, crate::types::DataType::Artists, sender, None, "20260101-000000").unwrap();
+    assert_eq!(drain.join().unwrap(), count);
+    count
+}
+
+#[test]
+fn xz_thread_count_defaults_capped_and_env_overrides() {
+    assert_eq!(resolve_xz_threads(None, 14), 6);
+    assert_eq!(resolve_xz_threads(None, 4), 4);
+    assert_eq!(resolve_xz_threads(None, 0), 1);
+    assert_eq!(resolve_xz_threads(Some("2"), 14), 2);
+    assert_eq!(resolve_xz_threads(Some(" 12 "), 4), 12);
+    // Invalid or zero overrides fall back to the capped default.
+    assert_eq!(resolve_xz_threads(Some("0"), 14), 6);
+    assert_eq!(resolve_xz_threads(Some("many"), 14), 6);
+}
+
+#[test]
+fn mt_reencode_is_multi_block_and_round_trips_through_the_real_parser() {
+    let dir = TempDir::new().unwrap();
+    let content = artist_lines(60_000); // ~16 MB: several xz blocks at the chosen preset
+    let tar_path = tar_xz_file(dir.path(), "artist", content.as_bytes());
+    let out = dir.path().join("artist.jsonl.xz");
+
+    extract_entity_from_tarball(&tar_path, "artist", &out).unwrap();
+
+    // Byte-exact round trip through a plain single-stream decoder.
+    let mut decoded = Vec::new();
+    xz2::read::XzDecoder::new(std::fs::File::open(&out).unwrap()).read_to_end(&mut decoded).unwrap();
+    assert_eq!(decoded, content.as_bytes());
+
+    // The output really is multi-block: the stream index (before the 12-byte footer) lists >1 record.
+    let bytes = std::fs::read(&out).unwrap();
+    let footer = &bytes[bytes.len() - 12..];
+    let backward = (u32::from_le_bytes(footer[4..8].try_into().unwrap()) as usize + 1) * 4;
+    let index = &bytes[bytes.len() - 12 - backward..bytes.len() - 12];
+    assert_eq!(index[0], 0x00, "xz index indicator");
+    assert!(index[1] > 1, "expected a multi-block stream, index record count byte = {}", index[1]);
+
+    // Every line is parsed by the production parser.
+    assert_eq!(parse_count(&out), 60_000);
+    assert!(!tmp_download_path(&out).exists());
+}
+
+#[test]
+fn legacy_single_threaded_output_is_still_accepted_skipped_and_read() {
+    let dir = TempDir::new().unwrap();
+    let version_dir = dir.path().join("20260101-000000");
+    std::fs::create_dir(&version_dir).unwrap();
+    let content = artist_lines(500);
+
+    // Exactly what the old code wrote: preset 6, single thread.
+    let legacy = version_dir.join("artist.jsonl.xz");
+    let mut encoder = xz2::write::XzEncoder::new(std::fs::File::create(&legacy).unwrap(), 6);
+    encoder.write_all(content.as_bytes()).unwrap();
+    encoder.finish().unwrap();
+
+    assert!(entity_is_complete(&version_dir, "artist"));
+    assert_eq!(discover_mb_dump_files(&version_dir).unwrap().get(&crate::types::DataType::Artists), Some(&legacy));
+    assert_eq!(parse_count(&legacy), 500);
+}
+
+#[test]
+fn truncated_input_leaves_neither_final_nor_tmp_file() {
+    let dir = TempDir::new().unwrap();
+    let content = artist_lines(20_000);
+    let tar_path = tar_xz_file(dir.path(), "artist", content.as_bytes());
+    let full = std::fs::read(&tar_path).unwrap();
+    std::fs::write(&tar_path, &full[..full.len() / 2]).unwrap();
+    let out = dir.path().join("artist.jsonl.xz");
+
+    assert!(extract_entity_from_tarball(&tar_path, "artist", &out).is_err());
+    assert!(!out.exists());
+    assert!(!tmp_download_path(&out).exists());
+}
+
+// ─── manual throughput measurement (ignored; needs a real-shaped .tar.xz) ───
+//
+//   MB_BENCH_TARBALL=/path/artist.tar.xz MB_BENCH_ENTITY=artist \
+//     cargo test --release --lib bench_ -- --ignored --nocapture
+//
+// `MB_BENCH_LIMIT_MB` bounds the sweep/legacy runs so each has a hard deadline.
+
+fn bench_inputs() -> Option<(PathBuf, String, u64)> {
+    let tarball = PathBuf::from(std::env::var("MB_BENCH_TARBALL").ok()?);
+    let entity = std::env::var("MB_BENCH_ENTITY").unwrap_or_else(|_| "artist".into());
+    let limit_mb = std::env::var("MB_BENCH_LIMIT_MB").ok().and_then(|v| v.parse().ok()).unwrap_or(200u64);
+    Some((tarball, entity, limit_mb * 1024 * 1024))
+}
+
+/// Encode up to `limit` bytes of the entity with the given encoder; returns (MB/s, out bytes, in bytes).
+fn bench_encode(tarball: &Path, entity: &str, limit: u64, make: impl FnOnce(Vec<u8>) -> xz2::write::XzEncoder<Vec<u8>>) -> (f64, u64, u64) {
+    let xz = xz2::read::XzDecoder::new(std::fs::File::open(tarball).unwrap());
+    let mut archive = tar::Archive::new(xz);
+    let suffix = format!("mbdump/{entity}");
+    let mut entry = archive.entries().unwrap().map(|e| e.unwrap()).find(|e| e.path().unwrap().ends_with(&suffix)).unwrap();
+    let mut encoder = make(Vec::new());
+    let mut buf = vec![0u8; 256 * 1024];
+    let mut total = 0u64;
+    let start = std::time::Instant::now();
+    while total < limit {
+        let n = entry.read(&mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        encoder.write_all(&buf[..n]).unwrap();
+        total += n as u64;
+    }
+    let out = encoder.finish().unwrap().len() as u64;
+    (total as f64 / 1_048_576.0 / start.elapsed().as_secs_f64(), out, total)
+}
+
+#[test]
+#[ignore]
+fn bench_encoder_sweep() {
+    let Some((tarball, entity, limit)) = bench_inputs() else { return };
+    // Decode-only ceiling: the tar.xz input decode is single-threaded and bounds any encoder.
+    let xz = xz2::read::XzDecoder::new(std::fs::File::open(&tarball).unwrap());
+    let mut archive = tar::Archive::new(xz);
+    let suffix = format!("mbdump/{entity}");
+    let mut entry = archive.entries().unwrap().map(|e| e.unwrap()).find(|e| e.path().unwrap().ends_with(&suffix)).unwrap();
+    let mut buf = vec![0u8; 256 * 1024];
+    let (mut total, start) = (0u64, std::time::Instant::now());
+    while total < limit {
+        let n = entry.read(&mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        total += n as u64;
+    }
+    println!("decode-only ceiling: {:.1} MB/s", total as f64 / 1_048_576.0 / start.elapsed().as_secs_f64());
+    drop(entry);
+
+    let (rate, out, inp) = bench_encode(&tarball, &entity, limit, |w| xz2::write::XzEncoder::new(w, 6));
+    println!("legacy preset6 x1: {rate:.1} MB/s, ratio {:.2}x ({inp} -> {out})", inp as f64 / out as f64);
+    for preset in [0u32, 1, 2, 3, 6] {
+        for threads in [2u32, 4, 6, 8] {
+            let (rate, out, inp) = bench_encode(&tarball, &entity, limit, |w| {
+                let s = xz2::stream::MtStreamBuilder::new().threads(threads).preset(preset).check(xz2::stream::Check::Crc64).encoder().unwrap();
+                xz2::write::XzEncoder::new_stream(w, s)
+            });
+            println!("mt preset{preset} x{threads}: {rate:.1} MB/s, ratio {:.2}x ({inp} -> {out})", inp as f64 / out as f64);
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn bench_extract_end_to_end() {
+    let Some((tarball, entity, _)) = bench_inputs() else { return };
+    let dir = TempDir::new().unwrap();
+    let out = dir.path().join(format!("{entity}.jsonl.xz"));
+    let start = std::time::Instant::now();
+    extract_entity_from_tarball(&tarball, &entity, &out).unwrap();
+    let secs = start.elapsed().as_secs_f64();
+    let compressed = std::fs::metadata(&out).unwrap().len();
+    let mut decoded_bytes = 0u64;
+    let mut decoder = xz2::read::XzDecoder::new(std::fs::File::open(&out).unwrap());
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = decoder.read(&mut buf).unwrap();
+        if n == 0 {
+            break;
+        }
+        decoded_bytes += n as u64;
+    }
+    println!(
+        "end-to-end: {:.1} MB uncompressed in {secs:.1}s = {:.1} MB/s, output {:.1} MB (threads={})",
+        decoded_bytes as f64 / 1_048_576.0,
+        decoded_bytes as f64 / 1_048_576.0 / secs,
+        compressed as f64 / 1_048_576.0,
+        xz_threads()
+    );
+    println!("lines parsed by real parser: {}", parse_count(&out));
+}
