@@ -3,6 +3,16 @@
 All notable changes to this repository will be recorded here by Commitizen from
 Conventional Commits.
 
+## v0.4.1 (2026-11-06)
+
+### Release notes
+
+The download step recompresses with a multi-threaded xz encoder, preset 1, about 30 times faster. The default is up to 6 threads; set MUSICBRAINZ_XZ_THREADS to change it. Output is about 30% larger, and files from older releases are still accepted.
+
+### Perf
+
+- **downloader**: re-encode entity dumps with multi-threaded xz
+
 ## v0.4.0 (2026-11-06)
 
 ### Release notes
